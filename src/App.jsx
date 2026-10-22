@@ -1,0 +1,251 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CAT_ORDER } from './lib/constants.js';
+import { ask, hasApiKey } from './lib/ai.js';
+import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, loadEntries } from './lib/store.js';
+import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
+import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
+import Hero from './components/Hero.jsx';
+import Library from './components/Library.jsx';
+import { DetailPanel, EntryForm } from './components/Detail.jsx';
+import Questions from './components/Questions.jsx';
+import Passage from './components/Passage.jsx';
+import Timer from './components/Timer.jsx';
+import { MyPage, Record } from './components/Record.jsx';
+import Settings from './components/Settings.jsx';
+
+const EMPTY_FORM = { title: '', category: '', summary: '', keywords: '', body: '' };
+const INTRO_MS = 3400;
+
+function beep(acRef, n) {
+  try {
+    const ac = acRef.current || (acRef.current = new (window.AudioContext || window.webkitAudioContext)());
+    for (let i = 0; i < n; i++) {
+      const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ac.destination);
+      const t = ac.currentTime + i * 0.28;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.start(t); o.stop(t + 0.24);
+    }
+  } catch { /* audio unavailable */ }
+}
+
+// Sections fade up as they scroll into view; held back until the intro has closed.
+function useReveal(t0, introRef) {
+  useEffect(() => {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const els = [...document.querySelectorAll('[data-reveal]')];
+    els.forEach(el => { el.style.opacity = '0'; el.style.transform = 'translateY(28px)'; });
+    const io = new IntersectionObserver(ents => ents.forEach(en => {
+      if (!en.isIntersecting) return;
+      const el = en.target; io.unobserve(el);
+      const introLeft = introRef.current ? Math.max(0, 2900 - (performance.now() - t0)) : 0;
+      const d = (+el.dataset.d || 0) + introLeft;
+      el.style.transition = `opacity .9s cubic-bezier(.2,.7,.2,1) ${d}ms, transform .9s cubic-bezier(.2,.7,.2,1) ${d}ms`;
+      requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'none'; });
+      setTimeout(() => { el.style.transition = ''; el.style.transform = ''; }, d + 1000);
+    }), { threshold: 0.12 });
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [t0, introRef]);
+}
+
+export default function App() {
+  const [t0] = useState(() => performance.now());
+  const [intro, setIntro] = useState(true);
+  const introRef = useRef(true); introRef.current = intro;
+
+  const [entries, setEntries] = useState(loadEntries);
+  const [attempts, setAttempts] = useState(() => loadJSON(ATTEMPTS_KEY, []));
+  const [analysis, setAnalysisState] = useState(() => loadJSON(ANALYSIS_KEY, null));
+
+  const [cat, setCatState] = useState('전체');
+  const [search, setSearchState] = useState('');
+  const [page, setPageState] = useState(0);
+  const [openId, setOpenId] = useState(null);
+  const [form, setForm] = useState(null);
+  const [uploading, setUploading] = useState(0);
+  const [restructuring, setRestructuring] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aiOn, setAiOn] = useState(hasApiKey);
+  useEffect(() => { const id = setTimeout(() => setAiOn(hasApiKey()), 1500); return () => clearTimeout(id); }, []);
+  const [toast, setToast] = useState('');
+
+  const [qTopic, setQTopic] = useState('');
+  const [qList, setQList] = useState([]);
+  const [pTopic, setPTopic] = useState('');
+
+  const [tQuestion, setTQuestion] = useState('');
+  const [timer, setTimer] = useState({ prep: 300, ans: 180, phase: 'idle', remain: 300, running: false });
+
+  const refs = { lib: useRef(null), q: useRef(null), p: useRef(null), t: useRef(null), r: useRef(null), m: useRef(null) };
+  const acRef = useRef(null);
+  const toastT = useRef(0);
+  const fallbackNoticed = useRef(false);
+
+  useReveal(t0, introRef);
+  useEffect(() => { const id = setTimeout(() => setIntro(false), INTRO_MS); return () => clearTimeout(id); }, []);
+
+  const flash = useCallback(t => { setToast(t); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(''), 2600); }, []);
+  const scroll = key => scrollToEl(refs[key].current);
+  const save = useCallback(next => setEntries(prev => { const v = typeof next === 'function' ? next(prev) : next; saveJSON(ENTRIES_KEY, v); return v; }), []);
+  const saveAttempts = useCallback(next => setAttempts(prev => { const v = next(prev); saveJSON(ATTEMPTS_KEY, v.slice(0, 200)); return v; }), []);
+  const setAnalysis = an => { setAnalysisState(an); saveJSON(ANALYSIS_KEY, an); };
+  const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
+  // Point out the settings once when a generator falls back to templates for lack of a key.
+  const onFallback = () => {
+    if (hasApiKey() || fallbackNoticed.current) return;
+    fallbackNoticed.current = true;
+    flash('AI 키가 없어 기본 문장으로 만들었어요 · 맨 아래 ‘AI 설정’에서 연결할 수 있어요');
+  };
+
+  // Timer tick: prep → answer (one beep) → done (three beeps).
+  useEffect(() => {
+    if (!timer.running) return;
+    const id = setInterval(() => setTimer(s => {
+      if (!s.running) return s;
+      if (s.remain > 1) return { ...s, remain: s.remain - 1 };
+      if (s.phase === 'prep') { beep(acRef, 1); return { ...s, phase: 'answer', remain: s.ans }; }
+      beep(acRef, 3); return { ...s, phase: 'done', remain: 0, running: false };
+    }), 1000);
+    return () => clearInterval(id);
+  }, [timer.running]);
+
+  const practice = q => {
+    setTQuestion(q); setOpenId(null);
+    setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans }));
+    scroll('t');
+  };
+
+  const categories = useMemo(() => {
+    const present = [...new Set(entries.map(e => e.category || '기타'))];
+    return [...CAT_ORDER.filter(c => present.includes(c)), ...present.filter(c => !CAT_ORDER.includes(c))];
+  }, [entries]);
+
+  // One question per calendar day, picked deterministically from the library.
+  const today = useMemo(() => {
+    const d = new Date(), seed = d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate();
+    const pool = entries.filter(e => (e.questions || []).length);
+    if (!pool.length) return null;
+    const e = pool[seed % pool.length];
+    return { q: e.questions[seed % e.questions.length], cat: e.category + ' · ' + e.title };
+  }, [entries]);
+
+  const validId = id => (id && entries.some(e => e.id === id) ? id : entries[0] && entries[0].id) || '';
+  const od = entries.find(e => e.id === openId) || null;
+
+  async function restructureEntry(id, current) {
+    const e = current || entries.find(x => x.id === id); if (!e) return false;
+    const r = parseJSON(await ask(`다음 자료를 한국 대학/취업 면접 대비용 지식 카드로 재구성해줘. 반드시 JSON 객체만 출력:\n{"title":"주제명(짧게)","category":"${CAT_ORDER.join('|')} 중 하나","summary":"한 문장 요약","keywords":["3개"],"background":"배경 2~3문장","issues":["핵심 쟁점 3개, '-인가/-한가'로 끝낼 것"],"pro":["찬성·긍정 관점 2~3개"],"con":["반대·우려 관점 2~3개"],"questions":["예상 면접 질문 3개, '까?' 또는 '-시오.'로 끝낼 것"]}\n\n자료:\n${ctx(e)}`));
+    if (!r || !r.summary) return false;
+    updateEntry(id, { title: r.title || e.title, category: r.category || e.category, summary: r.summary, keywords: r.keywords || [], background: r.background || '', issues: r.issues || [], pro: r.pro || [], con: r.con || [], questions: r.questions || [] });
+    return true;
+  }
+
+  async function handleFiles(files) {
+    const list = [...files]; if (!list.length) return;
+    setUploading(list.length);
+    const added = [];
+    for (const f of list) {
+      const text = await f.text(), base = f.name.replace(/\.[^.]+$/, '');
+      if (/\.json$/i.test(f.name)) {
+        const j = parseJSON(text); const arr = Array.isArray(j) ? j : (j ? [j] : []);
+        arr.forEach(o => added.push({ id: uid(), category: o.category || '업로드', title: o.title || base, summary: o.summary || '', keywords: o.keywords || [], background: o.background || '', issues: o.issues || [], pro: o.pro || [], con: o.con || [], questions: o.questions || [], body: o.body || '', myView: o.myView || '', source: f.name, _raw: !o.summary }));
+        continue;
+      }
+      // Markdown split on '# 제목' headings → one entry per section.
+      const parts = text.split(/\n(?=#\s)/).map(s => s.trim()).filter(Boolean);
+      const chunks = parts.length > 1 || /^#\s/.test(text.trim()) ? parts : [text.trim()];
+      chunks.forEach(c => {
+        let title = base, body = c;
+        if (/^#\s/.test(c)) { const nl = c.indexOf('\n'); title = (nl < 0 ? c : c.slice(0, nl)).replace(/^#\s*/, '').trim(); body = nl < 0 ? '' : c.slice(nl + 1).trim(); }
+        added.push({ id: uid(), category: '업로드', title, summary: body.replace(/\s+/g, ' ').slice(0, 120), keywords: [], body, myView: '', source: f.name, _raw: true });
+      });
+    }
+    save(prev => [...added.map(({ _raw, ...a }) => a), ...prev]);
+    setForm(null); setCatState('전체'); setPageState(0);
+    const ai = hasApiKey();
+    flash(`${added.length}개 항목을 추가했습니다${ai ? ' · AI 재구성 중…' : ''}`);
+    scroll('lib');
+    if (ai) {
+      for (const a of added.filter(x => x._raw).slice(0, 10)) await restructureEntry(a.id, a);
+      flash('재구성 완료');
+    }
+    setUploading(0);
+  }
+
+  const saveForm = () => {
+    const f = form;
+    if (!f.title.trim()) { flash('제목을 입력하세요'); return; }
+    const kw = f.keywords.split(',').map(x => x.trim()).filter(Boolean);
+    const patch = { title: f.title.trim(), category: f.category.trim() || '기타', summary: f.summary.trim() || f.body.replace(/\s+/g, ' ').slice(0, 120), keywords: kw, body: f.body };
+    if (f.id) updateEntry(f.id, patch); else save(prev => [{ id: uid(), myView: '', ...patch }, ...prev]);
+    setForm(null); flash('저장했습니다');
+  };
+
+  const go = { lib: () => scroll('lib'), q: () => scroll('q'), p: () => scroll('p'), t: () => scroll('t'), m: () => scroll('m') };
+
+  return (
+    <div className="page">
+      <Header go={go} />
+      <Hero
+        t0={t0} categories={categories} today={today} hasAttempts={attempts.length > 0}
+        onToday={() => {
+          const all = entries.flatMap(e => e.questions || []);
+          if (today) practice(today.q); else if (all.length) practice(all[Math.floor(Math.random() * all.length)]);
+        }}
+        onContinue={() => scroll(attempts.length ? 'm' : 'lib')}
+        onCategory={c => { setCatState(c); setPageState(0); scroll('lib'); }}
+      />
+      <Library
+        ref={refs.lib} entries={entries} categories={categories}
+        cat={cat} setCat={c => { setCatState(c); setPageState(0); }}
+        search={search} setSearch={v => { setSearchState(v); setPageState(0); }}
+        page={page} setPage={p => { setPageState(p); scroll('lib'); }}
+        onOpen={setOpenId} onNew={() => setForm(EMPTY_FORM)}
+      />
+      <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} onPractice={practice} onFallback={onFallback} />
+      <Passage ref={refs.p} entries={entries} topicId={validId(pTopic)} setTopicId={setPTopic} onPractice={practice} onFallback={onFallback} flash={flash} />
+      <Timer
+        ref={refs.t} timer={timer} question={tQuestion} setQuestion={setTQuestion}
+        onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
+        onStart={() => setTimer(s => {
+          if (s.phase === 'idle' || s.phase === 'done') { const p = s.prep > 0 ? 'prep' : 'answer'; return { ...s, phase: p, remain: p === 'prep' ? s.prep : s.ans, running: true }; }
+          return { ...s, running: !s.running };
+        })}
+        onSkip={() => setTimer(s => ({ ...s, phase: 'answer', remain: s.ans, running: true }))}
+        onReset={() => setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans }))}
+        setPrep={v => setTimer(s => ({ ...s, prep: v, remain: s.phase === 'idle' ? (v || s.ans) : s.remain }))}
+        setAns={v => setTimer(s => ({ ...s, ans: v, remain: s.phase === 'idle' && !s.prep ? v : s.remain }))}
+      />
+      <Record
+        ref={refs.r} timer={timer} question={tQuestion} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
+        onFinish={() => setTimer(s => ({ ...s, phase: 'done', running: false, remain: 0 }))}
+        onPractice={practice} flash={flash}
+      />
+      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} onPractice={practice} flash={flash} />
+      <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
+
+      {od && (
+        <DetailPanel
+          entry={od} restructuring={restructuring}
+          onClose={() => setOpenId(null)}
+          onRestructure={async () => {
+            if (restructuring) return;
+            if (!hasApiKey()) { flash('AI 재구성은 맨 아래 ‘AI 설정’에서 키를 연결해야 쓸 수 있어요'); return; }
+            setRestructuring(true); const ok = await restructureEntry(od.id); setRestructuring(false);
+            flash(ok ? '재구성했습니다' : '재구성에 실패했습니다');
+          }}
+          onEdit={() => setForm({ id: od.id, title: od.title, category: od.category, summary: od.summary || '', keywords: (od.keywords || []).join(', '), body: od.body || '' })}
+          onDelete={() => { save(prev => prev.filter(e => e.id !== od.id)); setOpenId(null); flash('삭제했습니다'); }}
+          onPractice={practice}
+          onMyView={v => updateEntry(od.id, { myView: v })}
+          onToQuestions={() => { setQTopic(od.id); setOpenId(null); scroll('q'); }}
+          onToPassage={() => { setPTopic(od.id); setOpenId(null); scroll('p'); }}
+        />
+      )}
+      {form && <EntryForm form={form} setForm={setForm} uploading={uploading} onClose={() => setForm(null)} onSave={saveForm} onFiles={handleFiles} />}
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} onSaved={msg => { setAiOn(hasApiKey()); setSettingsOpen(false); flash(msg); }} />}
+      <Toast text={toast} />
+      {intro && <Intro onSkip={() => setIntro(false)} />}
+    </div>
+  );
+}
