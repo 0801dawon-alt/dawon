@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>body{margin:0;background:#d9d6d2;font-family:Pretendard,sans-serif}a{color:#4b1519}a:hover{color:#8a3b34}*{box-sizing:border-box}</style>
+</helmet>
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+<section style="padding:48px;display:flex;flex-direction:column;gap:28px;border-bottom:1px solid #c4c0bb">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:28px;font-weight:700;letter-spacing:-0.03em;color:#2a2422">{{ g.title }}</div><div style="font-size:14px;color:#5a5250">{{ g.sub }}</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <sc-for list="{{ g.pals }}" as="p" hint-placeholder-count="3">
+      <div id="{{ p.id }}" style="width:520px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;background:#2a2422;color:#fff;padding:3px 8px">{{ p.id }}</span>
+          <span style="font-size:16px;font-weight:700;color:#2a2422">{{ p.name }}</span>
+          <span style="font-size:13px;color:#5a5250">{{ p.note }}</span>
+        </div>
+        <div style="background:linear-gradient({{ p.sky }} 0px,{{ p.bg }} 300px);color:{{ p.ink }};overflow:hidden;box-shadow:0 20px 40px -22px rgba(0,0,0,0.35)">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-size:12px"><span style="color:{{ p.dark }}"><b style="font-weight:800">thought.</b> library</span><span style="font-size:9px;padding:5px 10px;border-radius:999px;background:{{ p.dark }};color:{{ p.darkFg }}">+ 새 항목</span></div>
+          <div style="text-align:center;padding:18px 0 34px;font-weight:600;font-size:26px;line-height:1.1;letter-spacing:-0.05em">사회문제에 대해,<br>당신의 생각은?</div>
+          <div style="position:relative;height:200px;margin:0 10px;overflow:hidden">
+            <sc-for list="{{ p.stack }}" as="f">
+              <div style="position:absolute;left:{{ f.l }}%;right:{{ f.l }}%;top:{{ f.top }}px;height:220px">
+                <div style="position:absolute;left:{{ f.tab }}%;top:-20px;height:22px;padding:0 14px;border-radius:9px 9px 0 0;background:{{ f.c }};color:{{ f.fg }};display:flex;align-items:center;font-size:10px;font-weight:500;white-space:nowrap">{{ f.label }}</div>
+                <div style="position:absolute;inset:0;background:{{ f.c }};border-radius:3px 12px 0 0;box-shadow:0 -5px 12px -8px rgba(0,0,0,0.3)"></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:{{ p.panel }};margin:-40px 10px 0;position:relative;border-radius:3px 14px 0 0;padding:18px 16px 16px;display:flex;flex-direction:column;gap:10px">
+            <div style="font-weight:600;font-size:15px;letter-spacing:-0.03em">지식 서재</div>
+            <div style="display:flex;gap:3px;align-items:flex-end">
+              <span style="font-size:9px;font-weight:700;padding:5px 10px;border-radius:7px 7px 0 0;background:{{ p.tabOn }}">전체</span>
+              <span style="font-size:9px;padding:5px 10px;border-radius:7px 7px 0 0;background:rgba(255,255,255,0.5);transform:translateY(3px)">정치</span>
+              <span style="font-size:9px;padding:5px 10px;border-radius:7px 7px 0 0;background:rgba(255,255,255,0.5);transform:translateY(3px)">경제</span>
+              <span style="font-size:9px;padding:5px 10px;border-radius:7px 7px 0 0;background:rgba(255,255,255,0.5);transform:translateY(3px)">사회</span>
+            </div>
+            <div style="background:{{ p.tabOn }};margin-top:-10px;border-radius:0 10px 10px 10px;padding:18px 10px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <sc-for list="{{ p.cards }}" as="c">
+                <div style="position:relative;margin-top:12px">
+                  <div style="position:absolute;left:0;top:-13px;height:14px;padding:0 8px;border-radius:6px 6px 0 0;background:{{ c.c }};font-size:7px;font-weight:600;display:flex;align-items:center">{{ c.cat }}</div>
+                  <div style="background:#fbf9f6;border-radius:0 8px 4px 4px;padding:10px;min-height:62px;font-size:10px;font-weight:600;line-height:1.35">{{ c.t }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:{{ p.dark }};color:{{ p.darkFg }};margin:0 10px;padding:16px;display:flex;align-items:center;gap:18px">
+            <div style="width:84px;height:84px;border-radius:50%;background:conic-gradient({{ p.ring }} 140deg, rgba(255,255,255,0.14) 0deg);padding:3px;flex-shrink:0"><div style="width:100%;height:100%;border-radius:50%;background:{{ p.dark }};display:flex;align-items:center;justify-content:center;font-weight:200;font-size:22px;letter-spacing:-0.04em">01:24</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:14px">면접 연습 타이머</span><span style="display:flex;gap:4px"><span style="font-size:9px;font-weight:700;padding:5px 10px;border-radius:7px 7px 2px 2px;background:{{ p.ring }};color:{{ p.dark }}">시작</span><span style="font-size:9px;padding:5px 10px;border-radius:7px 7px 2px 2px;background:rgba(255,255,255,0.12)">초기화</span></span></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:5px">
+          <sc-for list="{{ p.sw }}" as="s"><div style="display:flex;flex-direction:column;gap:3px"><div style="width:48px;height:24px;background:{{ s }};border:1px solid rgba(0,0,0,0.08)"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5a5250">{{ s }}</span></div></sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</sc-for>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const CATS=['정치','경제','사회','법','문화'];
+const P2=[
+ {id:'A2',name:'로즈 클레이 & 와인',note:'A 발전 · 채도 낮춘 장밋빛 흙색',sky:'#dfe3e7',bg:'#e6e1db',ink:'#3a2624',dark:'#3e1418',darkFg:'#f4e9e4',panel:'#ddd6cf',tabOn:'#efebe6',ring:'#c98e7e',f:['#b9a39c','#d2b49a','#c98e7e','#a8857f','#ddd3c9']},
+ {id:'D2',name:'테라코타 & 딥 올리브',note:'D 발전 · 가죽·리넨 같은 깊은 톤',sky:'#e3ddd2',bg:'#e5ded2',ink:'#33261c',dark:'#2f2e1a',darkFg:'#f1ece0',panel:'#ddd4c6',tabOn:'#f0ebe2',ring:'#c9a27f',f:['#b8735a','#c9a27f','#8f8b62','#d6c6ad','#a88367']}
+];
+const P=[
+ {id:'A',name:'피치 & 버건디',note:'현재 버전 · 따뜻하고 부드러움',sky:'#cfe3f2',bg:'#e9e4de',ink:'#4a2e2c',dark:'#4b1519',darkFg:'#fbeee8',panel:'#e7e2dc',tabOn:'#f4f1ec',ring:'#f2a891',f:['#e8b5b3','#f1c398','#f2a891','#d8c6d6','#f0cfc4']},
+ {id:'B',name:'세이지 & 포레스트',note:'차분한 서재 · 집중감',sky:'#dde8e2',bg:'#ebe8e0',ink:'#2a332c',dark:'#1f3a2e',darkFg:'#eef2ea',panel:'#e4e0d5',tabOn:'#f3f1ea',ring:'#c9d9a6',f:['#b8c9a8','#e3d6b4','#d6c7a8','#9fb8a6','#e8e0cc']},
+ {id:'C',name:'라벤더 & 잉크 네이비',note:'지적이고 정돈된 느낌',sky:'#dfe3f3',bg:'#eae8ec',ink:'#2a2d40',dark:'#1c2440',darkFg:'#eef0f8',panel:'#e3e1e8',tabOn:'#f4f3f7',ring:'#c9c3e6',f:['#c9c3e6','#e6d8ec','#b9cbe8','#e5e2dc','#d6dcef']},
+ {id:'D',name:'테라코타 & 올리브',note:'빈티지 종이 · 클래식',sky:'#f1e6d6',bg:'#ece5da',ink:'#3f2e22',dark:'#3d3a1f',darkFg:'#f3efe2',panel:'#e6ddcf',tabOn:'#f5f0e7',ring:'#d98c6a',f:['#d98c6a','#e8c39e','#b9b48a','#e9d9bf','#cfa98a']},
+ {id:'E',name:'모노 + 레드 포인트',note:'가장 간결 · 색은 한 곳만',sky:'#ececea',bg:'#e6e5e2',ink:'#1a1a1a',dark:'#1a1a1a',darkFg:'#f2f1ee',panel:'#dfddd9',tabOn:'#f4f3f0',ring:'#d9462b',f:['#d6d3ce','#e4e2de','#c8c4be','#d9462b','#f0efec']},
+ {id:'F',name:'버터 & 코발트',note:'밝고 산뜻 · 에너지',sky:'#dbe6f7',bg:'#eceae4',ink:'#23263a',dark:'#233a8c',darkFg:'#f3f5fc',panel:'#e5e2da',tabOn:'#f6f4ee',ring:'#f3dc8a',f:['#f3dc8a','#c6d6f2','#f6e9c4','#e9e4da','#a9bfe8']}
+];
+class Component extends DCLogic {
+  renderVals(){
+    const map=p=>({...p,
+      stack:p.f.map((c,i)=>({c,fg:p.id==='E'&&c==='#d9462b'?'#ffffff':p.ink,label:CATS[i],l:(12-i*2.4).toFixed(1),top:24+i*24,tab:[6,40,66,20,52][i]})).concat([{c:p.dark,fg:p.darkFg,label:'thought. library',l:0,top:24+5*24+6,tab:30}]),
+      cards:[{cat:'사회',t:'저출산과 인구절벽',c:p.f[2]},{cat:'환경',t:'기후위기와 탄소중립',c:p.f[1]},{cat:'과학',t:'생성형 AI와 일자리',c:p.f[3]}],
+      sw:[p.sky,...p.f.slice(0,4),p.dark]});
+    return { groups:[{title:'2차 · 단정하고 세련된 톤',sub:'A2 → v6 · D2 → v7',pals:P2.map(map)}] };
+  }
+}
+</script>
+</body>
+</html>

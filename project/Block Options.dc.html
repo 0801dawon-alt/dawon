@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>body{margin:0;background:#e9e7e1;font-family:Pretendard,sans-serif}a{color:#151515}a:hover{color:#6b6966}</style><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;500&family=IBM+Plex+Mono&display=swap" rel="stylesheet"></helmet>
+<section style="padding:48px;display:flex;flex-direction:column;gap:24px;border-bottom:1px solid #d8d5c6">
+  <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#6b6966">3차 · 밝은 회색 · 투명 블록</span><h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:500;font-size:26px">라이트 그레이 글래스 3안</h2></div>
+  <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+    <div id="3a" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">3a</span><span style="font-size:14px">클리어 — 맑은 회색 유리, 얇은 하이라이트</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,rgba(214,212,206,0.42),rgba(214,212,206,0.14));border:1px solid rgba(225,223,218,0.4);box-shadow:inset 0 1px 0 rgba(255,255,255,0.5), 0 3px 6px -2px rgba(0,0,0,0.4)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div id="3b" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">3b</span><span style="font-size:14px">소프트 — 뿌옇게 두툼한 회색 블록, 부드러운 그림자</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:20px;height:18px;border-radius:6px;background:linear-gradient(180deg,rgba(220,218,213,0.55),rgba(190,188,183,0.25));border:1px solid rgba(230,228,223,0.3);box-shadow:inset 0 2px 3px rgba(255,255,255,0.4), inset 0 -2px 3px rgba(0,0,0,0.15), 0 6px 10px -4px rgba(0,0,0,0.5)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div id="3c" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">3c</span><span style="font-size:14px">글로우 — 회색 유리 뒤로 은은한 빛 번짐</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,rgba(210,208,203,0.38),rgba(210,208,203,0.12));border:1px solid rgba(235,233,228,0.42);box-shadow:0 0 9px 1px rgba(225,223,218,0.22), inset 0 1px 0 rgba(255,255,255,0.45)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</section>
+<section style="padding:48px;display:flex;flex-direction:column;gap:24px;border-bottom:1px solid #d8d5c6">
+  <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#6b6966">2차 · 단색 · 투명 블록</span><h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:500;font-size:26px">투명 블록 3안</h2></div>
+  <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+    <div id="2a" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">2a</span><span style="font-size:14px">프로스트 — 흰빛이 감도는 반투명 유리</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,rgba(243,241,232,0.34),rgba(243,241,232,0.08));border:1px solid rgba(243,241,232,0.32);box-shadow:inset 0 1px 1px rgba(255,255,255,0.35), 0 4px 8px -2px rgba(0,0,0,0.45)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div id="2b" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">2b</span><span style="font-size:14px">앰버 글래스 — 은은한 호박빛 투명 블록</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,rgba(214,176,112,0.55),rgba(168,132,71,0.18));border:1px solid rgba(232,204,150,0.38);box-shadow:inset 0 1px 1px rgba(255,240,210,0.45), 0 5px 10px -3px rgba(168,132,71,0.55)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div id="2c" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">2c</span><span style="font-size:14px">스모크 — 어두운 유리 가장자리에 맺힌 빛</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,rgba(20,19,18,0.55),rgba(20,19,18,0.2));border:1px solid rgba(243,241,232,0.45);box-shadow:0 0 8px rgba(243,241,232,0.28), inset 0 1px 0 rgba(255,255,255,0.3)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</section>
+<section style="padding:48px;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#6b6966">1차 · 첫 페이지 · 카테고리 블록</span><h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:500;font-size:26px">입체 블록 3안</h2></div>
+  <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+    <div id="1a" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">1a</span><span style="font-size:14px">백라이트 — 뒤에서 은은하게 새어 나오는 빛</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:{{ c.dark }};box-shadow:0 0 10px 1px {{ c.glow }}, inset 0 1px 0 rgba(255,255,255,0.12)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div id="1b" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">1b</span><span style="font-size:14px">클레이 — 매트하게 돌출된 블록과 부드러운 그림자</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(145deg,{{ c.top }},{{ c.dark }} 60%);box-shadow:2px 3px 4px rgba(0,0,0,0.45), -1px -1px 2px rgba(255,255,255,0.08), inset 1px 1px 0 rgba(255,255,255,0.18), inset -1px -2px 0 rgba(0,0,0,0.25)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div id="1c" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">1c</span><span style="font-size:14px">젤리 — 반투명한 블록 아래로 번지는 색 그림자</span></div>
+      <div style="background:#373533;padding:36px 32px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #4b4845">
+            <span style="display:flex;align-items:center;gap:16px;font-family:'Noto Serif KR',serif;font-weight:300;font-size:18px;color:#f3f1e8"><span style="width:22px;height:16px;border-radius:7px;background:linear-gradient(180deg,{{ c.top }},{{ c.dark }});border:1px solid rgba(255,255,255,0.14);box-shadow:0 5px 9px -2px {{ c.glow }}, inset 0 2px 3px rgba(255,255,255,0.22)"></span>{{ c.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ c.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals(){
+    const CC={사회:'#a0614f',법:'#4c5870',정치:'#7a3b3b',경제:'#a88447',과학:'#4f7682',환경:'#6b7a4e',문화:'#8d6e86',국제:'#5a6e7a'};
+    const N={사회:20,법:19,정치:20,경제:19,과학:18,환경:20,문화:20,국제:20};
+    return { cats:Object.keys(CC).map(k=>({label:k,n:N[k],
+      dark:`color-mix(in oklch, ${CC[k]} 62%, #373533)`,
+      top:`color-mix(in oklch, ${CC[k]} 85%, #373533)`,
+      glow:`color-mix(in oklch, ${CC[k]} 55%, transparent)`})) };
+  }
+}
+</script>
+</body>
+</html>

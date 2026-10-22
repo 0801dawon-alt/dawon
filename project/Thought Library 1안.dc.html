@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;500;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+body{margin:0;background:#f3f1e8;color:#151515;font-family:Pretendard,'Apple SD Gothic Neo',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#151515}a:hover{color:#6b6966}
+*{box-sizing:border-box}
+::selection{background:#151515;color:#f3f1e8}
+@keyframes tlspin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#f3f1e8">
+
+<header style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px clamp(20px,5vw,64px);flex-wrap:wrap">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:30px;height:30px;border:1.5px solid #151515"></div>
+    <div style="font-family:'Noto Serif KR',serif;font-weight:700;font-size:17px;line-height:1.05;letter-spacing:-0.01em">Thought<br>Library</div>
+  </div>
+  <nav style="display:flex;gap:28px;flex-wrap:wrap;font-size:12px;letter-spacing:0.18em;text-transform:uppercase">
+    <span onClick="{{ goLib }}" style="cursor:pointer" style-hover="opacity:0.5">Library</span>
+    <span onClick="{{ goQ }}" style="cursor:pointer" style-hover="opacity:0.5">Questions</span>
+    <span onClick="{{ goP }}" style="cursor:pointer" style-hover="opacity:0.5">Passage</span>
+    <span onClick="{{ goT }}" style="cursor:pointer" style-hover="opacity:0.5">Timer</span>
+  </nav>
+</header>
+
+<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));min-height:520px">
+  <div style="padding:clamp(40px,8vw,110px) clamp(20px,5vw,64px);display:flex;flex-direction:column;justify-content:center;gap:28px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.2em;color:{{ accent2 }}">INTERVIEW NOTEBOOK</div>
+    <h1 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:500;font-size:clamp(34px,4.6vw,58px);line-height:1.22;letter-spacing:-0.03em;text-wrap:pretty">사회문제에 대해,<br>당신의 생각은<br>무엇인가요?</h1>
+    <p style="margin:0;max-width:420px;font-size:15px;line-height:1.75;color:#4a4845;text-wrap:pretty">자료를 올리면 주제별 지식 카드로 재구성합니다. 쟁점과 관점을 읽고, 예상 질문과 제시문을 만들고, 타이머로 답변을 연습하세요.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button onClick="{{ openUpload }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 22px;background:#151515;color:#f3f1e8;border:1px solid #151515;cursor:pointer" style-hover="background:#333">파일 업로드</button>
+      <button onClick="{{ openNew }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 22px;background:transparent;color:#151515;border:1px solid #151515;cursor:pointer" style-hover="background:#e8e6e1">직접 추가</button>
+    </div>
+  </div>
+  <div style="background:#373533;color:#f3f1e8;padding:clamp(32px,6vw,72px) clamp(24px,5vw,64px);display:flex;gap:40px">
+    <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:0.3em;color:#9a9893">INDEX</div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px">
+      <sc-for list="{{ indexList }}" as="ix" hint-placeholder-count="6">
+        <div onClick="{{ ix.go }}" style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #4b4845;cursor:pointer" style-hover="padding-left:8px">
+          <span style="display:flex;align-items:center;gap:14px;font-family:'Noto Serif KR',serif;font-size:clamp(20px,2.2vw,28px);font-weight:300"><span style="width:9px;height:9px;background:{{ ix.cc }}"></span>{{ ix.label }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#9a9893">{{ ix.count }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section ref="{{ libRef }}" style="display:grid;grid-template-columns:clamp(56px,9vw,120px) minmax(0,1fr);padding:clamp(56px,8vw,110px) clamp(16px,4vw,56px) clamp(56px,8vw,110px) 0">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+    <div style="font-family:'Noto Serif KR',serif;font-size:clamp(32px,4vw,52px);color:#c9c6bf;font-weight:300">01</div>
+    <div style="width:1px;height:64px;background:#151515"></div>
+    <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:0.3em">LIBRARY</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:32px;min-width:0">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(26px,3vw,36px);letter-spacing:-0.02em;word-break:keep-all">지식 서재.</h2>
+        <div style="width:40px;height:2px;background:{{ accent2 }}"></div>
+      </div>
+      <input value="{{ search }}" onChange="{{ onSearch }}" placeholder="주제·키워드 검색" style="font:inherit;font-size:14px;padding:12px 0;width:min(280px,100%);background:transparent;border:none;border-bottom:1px solid #151515;outline:none;color:#151515">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <sc-for list="{{ catChips }}" as="c" hint-placeholder-count="5">
+        <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 16px;border:1px solid #151515;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:1px;background:#d8d5c6;border:1px solid #d8d5c6">
+      <sc-for list="{{ cards }}" as="card" hint-placeholder-count="6">
+        <article onClick="{{ card.open }}" style="background:#f9f8f2;padding:28px 26px 26px;display:flex;flex-direction:column;gap:14px;min-height:250px;cursor:pointer;transition:background .2s" style-hover="background:#ecebe7">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.12em;color:#6b6966">
+            <span style="color:{{ accent }}">{{ card.no }}</span><span style="display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0"><span style="width:7px;height:7px;background:{{ card.cc }}"></span>{{ card.category }}</span>
+          </div>
+          <h3 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:500;font-size:21px;line-height:1.4;letter-spacing:-0.02em;text-wrap:pretty">{{ card.title }}</h3>
+          <p style="margin:0;font-size:13.5px;line-height:1.7;color:#4a4845;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ card.summary }}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;color:#6b6966">
+            <span>{{ card.kw }}</span><span style="text-decoration:underline;color:#151515">열기</span>
+          </div>
+        </article>
+      </sc-for>
+    </div>
+    <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 0;font-size:14px;color:#6b6966">조건에 맞는 항목이 없습니다.</div>
+    </sc-if>
+  </div>
+</section>
+
+<section ref="{{ qRef }}" style="background:#373533;color:#f3f1e8;display:grid;grid-template-columns:clamp(56px,9vw,120px) minmax(0,1fr);padding:clamp(56px,8vw,110px) clamp(16px,4vw,56px) clamp(56px,8vw,110px) 0">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+    <div style="font-family:'Noto Serif KR',serif;font-size:clamp(32px,4vw,52px);color:#4a4845;font-weight:300">02</div>
+    <div style="width:1px;height:64px;background:#f3f1e8"></div>
+    <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:0.3em">QUESTIONS</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:clamp(32px,5vw,72px);min-width:0">
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(26px,3vw,36px);letter-spacing:-0.02em;word-break:keep-all">예상 질문 만들기.</h2>
+        <div style="width:40px;height:2px;background:{{ accent2 }}"></div>
+        <p style="margin:0;font-size:14px;line-height:1.7;color:#b5b2ac">서재의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:8px;font-size:11px;letter-spacing:0.2em;color:#9a9893">주제
+        <select value="{{ qTopicId }}" onChange="{{ onQTopic }}" style="font:inherit;font-size:16px;letter-spacing:0;padding:12px 0;background:transparent;color:#f3f1e8;border:none;border-bottom:1px solid #f3f1e8;outline:none">
+          <sc-for list="{{ topicOptions }}" as="o"><option value="{{ o.value }}" style="color:#151515">{{ o.label }}</option></sc-for>
+        </select>
+      </label>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:11px;letter-spacing:0.2em;color:#9a9893">유형</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-for list="{{ qTypeChips }}" as="c" hint-placeholder-count="4">
+            <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 16px;border:1px solid #f3f1e8;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:11px;letter-spacing:0.2em;color:#9a9893">개수</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-for list="{{ qCountChips }}" as="c" hint-placeholder-count="3">
+            <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 16px;border:1px solid #f3f1e8;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <button onClick="{{ genQuestions }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:16px 22px;background:#f3f1e8;color:#151515;border:none;cursor:pointer;align-self:flex-start" style-hover="background:#d8d5c6">{{ qBtnLabel }}</button>
+    </div>
+    <div style="display:flex;flex-direction:column;min-width:0">
+      <sc-if value="{{ qEmpty }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px solid #4b4845;padding:40px 32px;font-size:14px;line-height:1.7;color:#9a9893">생성된 질문이 여기에 쌓입니다. 질문 옆의 ‘연습’을 누르면 아래 타이머로 바로 넘어갑니다.</div>
+      </sc-if>
+      <sc-for list="{{ qItems }}" as="qi" hint-placeholder-count="0">
+        <div style="display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:16px;padding:22px 0;border-bottom:1px solid #4b4845;align-items:start">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#9a9893;padding-top:4px">{{ qi.no }}</span>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'Noto Serif KR',serif;font-size:17px;line-height:1.6;text-wrap:pretty">{{ qi.q }}</div>
+            <div style="font-size:12.5px;line-height:1.6;color:#9a9893">{{ qi.intent }}</div>
+          </div>
+          <button onClick="{{ qi.practice }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:12px;padding:6px 12px;background:transparent;color:#f3f1e8;border:1px solid #4a4845;cursor:pointer;white-space:nowrap" style-hover="border-color:#f3f1e8">연습 →</button>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section ref="{{ pRef }}" style="background:#e8e6e1;display:grid;grid-template-columns:clamp(56px,9vw,120px) minmax(0,1fr);padding:clamp(56px,8vw,110px) clamp(16px,4vw,56px) clamp(56px,8vw,110px) 0">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+    <div style="font-family:'Noto Serif KR',serif;font-size:clamp(32px,4vw,52px);color:#b5b2ac;font-weight:300">03</div>
+    <div style="width:1px;height:64px;background:#151515"></div>
+    <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:0.3em">PASSAGE</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:40px;min-width:0">
+    <div style="display:flex;justify-content:space-between;gap:32px;flex-wrap:wrap;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:440px">
+        <h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(26px,3vw,36px);letter-spacing:-0.02em;word-break:keep-all">제시문 만들기.</h2>
+        <div style="width:40px;height:2px;background:{{ accent2 }}"></div>
+        <p style="margin:0;font-size:14px;line-height:1.7;color:#4a4845">제시문 기반 면접처럼 읽을거리와 문항을 함께 구성합니다.</p>
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end">
+        <label style="display:flex;flex-direction:column;gap:8px;font-size:11px;letter-spacing:0.2em;color:#6b6966">주제
+          <select value="{{ pTopicId }}" onChange="{{ onPTopic }}" style="font:inherit;font-size:15px;letter-spacing:0;padding:10px 0;min-width:200px;background:transparent;color:#151515;border:none;border-bottom:1px solid #151515;outline:none">
+            <sc-for list="{{ topicOptions }}" as="o"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
+          </select>
+        </label>
+        <button onClick="{{ genPassage }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 22px;background:#151515;color:#f3f1e8;border:none;cursor:pointer" style-hover="background:#333">{{ pBtnLabel }}</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;letter-spacing:0.2em;color:#6b6966;margin-right:6px">형식</span>
+        <sc-for list="{{ pFormatChips }}" as="c" hint-placeholder-count="4">
+          <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 14px;border:1px solid #151515;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;letter-spacing:0.2em;color:#6b6966;margin-right:6px">분량</span>
+        <sc-for list="{{ pLenChips }}" as="c" hint-placeholder-count="3">
+          <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 14px;border:1px solid #151515;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <sc-if value="{{ pEmpty }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#f9f8f2;border:1px solid #d8d5c6;padding:56px 40px;display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center">
+        <div style="font-family:'Noto Serif KR',serif;font-size:20px">아직 제시문이 없습니다</div>
+        <div style="font-size:13.5px;color:#6b6966">주제와 형식을 고르고 ‘제시문 생성’을 누르세요.</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ pHas }}" hint-placeholder-val="{{ false }}">
+      <article style="background:#f9f8f2;border:1px solid #d8d5c6;padding:clamp(28px,5vw,64px);display:flex;flex-direction:column;gap:32px;max-width:880px;width:100%;align-self:center;box-shadow:0 30px 60px -30px rgba(0,0,0,0.25)">
+        <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.15em;color:#6b6966;border-bottom:1px solid #151515;padding-bottom:14px">
+          <span>THOUGHT LIBRARY · 제시문 면접</span><span>{{ pMeta }}</span>
+        </div>
+        <h3 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:24px;letter-spacing:-0.02em;text-align:center">{{ pResult.title }}</h3>
+        <sc-for list="{{ pPassages }}" as="ps" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:12px;align-items:baseline">
+              <span style="font-family:'Noto Serif KR',serif;font-weight:700;font-size:16px;border:1px solid #151515;padding:2px 10px">{{ ps.label }}</span>
+              <span style="font-size:12px;color:#6b6966">{{ ps.source }}</span>
+            </div>
+            <p style="margin:0;font-family:'Noto Serif KR',serif;font-size:15.5px;line-height:1.95;text-align:justify;text-wrap:pretty;white-space:pre-wrap">{{ ps.text }}</p>
+          </div>
+        </sc-for>
+        <div style="border-top:1px solid #151515;padding-top:24px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:11px;letter-spacing:0.2em;color:#6b6966">문항</div>
+          <sc-for list="{{ pQuestions }}" as="pq" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:start">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:13px">{{ pq.no }}</span>
+              <span style="font-size:15px;line-height:1.7">{{ pq.q }}</span>
+              <button onClick="{{ pq.practice }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:12px;padding:6px 12px;background:transparent;border:1px solid #151515;cursor:pointer;white-space:nowrap" style-hover="background:#151515;color:#f3f1e8">연습 →</button>
+            </div>
+          </sc-for>
+        </div>
+      </article>
+    </sc-if>
+  </div>
+</section>
+
+<section ref="{{ tRef }}" style="background:#f3f1e8;display:grid;grid-template-columns:clamp(56px,9vw,120px) minmax(0,1fr);padding:clamp(56px,8vw,110px) clamp(16px,4vw,56px) clamp(40px,6vw,72px) 0;border-top:1px solid #d8d5c6">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+    <div style="font-family:'Noto Serif KR',serif;font-size:clamp(32px,4vw,52px);color:#c9c6bf;font-weight:300">04</div>
+    <div style="width:1px;height:64px;background:#151515"></div>
+    <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:0.3em">TIMER</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:36px;min-width:0">
+    <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(26px,3vw,36px);letter-spacing:-0.02em;word-break:keep-all">면접 연습 타이머.</h2>
+        <div style="width:40px;height:2px;background:{{ accent2 }}"></div>
+      </div>
+      <button onClick="{{ randomQ }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:10px 16px;background:transparent;border:1px solid #151515;cursor:pointer" style-hover="background:#e8e6e1">랜덤 질문 뽑기</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:11px;letter-spacing:0.2em;color:#6b6966">연습할 질문</span>
+      <textarea value="{{ tQuestion }}" onChange="{{ onTQuestion }}" rows="2" placeholder="질문을 입력하거나, 위에서 ‘연습 →’을 누르세요." style="font-family:'Noto Serif KR',serif;font-size:clamp(17px,2vw,22px);line-height:1.6;padding:12px 0;background:transparent;border:none;border-bottom:1px solid #151515;outline:none;resize:vertical;color:#151515"></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:clamp(28px,5vw,64px);align-items:center">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;gap:12px;font-size:12px;letter-spacing:0.2em">
+          <span style="width:8px;height:8px;border-radius:50%;background:{{ tDot }}"></span>
+          <span>{{ tPhaseLabel }}</span>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-weight:300;font-size:clamp(72px,13vw,168px);line-height:0.9;letter-spacing:-0.04em;color:{{ tColor }}">{{ tDisplay }}</div>
+        <div style="height:2px;background:#d8d5c6;position:relative;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:{{ tPct }}%;background:{{ tBar }};transition:width 1s linear"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button onClick="{{ tStart }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 28px;background:#151515;color:#f3f1e8;border:none;cursor:pointer;min-width:120px" style-hover="background:#333">{{ tStartLabel }}</button>
+          <button onClick="{{ tSkip }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 20px;background:transparent;border:1px solid #151515;cursor:pointer" style-hover="background:#e8e6e1">답변 시작</button>
+          <button onClick="{{ tReset }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 20px;background:transparent;border:1px solid #151515;cursor:pointer" style-hover="background:#e8e6e1">초기화</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:28px;background:#373533;color:#f3f1e8;padding:clamp(24px,4vw,40px)">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <span style="font-size:11px;letter-spacing:0.2em;color:#9a9893">준비 시간</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ prepChips }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 14px;border:1px solid #f3f1e8;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <span style="font-size:11px;letter-spacing:0.2em;color:#9a9893">답변 시간</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ ansChips }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.onClick }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:13px;padding:8px 14px;border:1px solid #f3f1e8;background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="font-size:12.5px;line-height:1.7;color:#9a9893">준비 시간이 끝나면 자동으로 답변 시간이 시작되고, 전환·종료 시 알림음이 울립니다.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:28px clamp(20px,5vw,64px);border-top:1px solid #d8d5c6;font-size:12px;color:#6b6966">
+  <span>© Thought Library</span><span>항목은 이 브라우저에 저장됩니다</span>
+</footer>
+
+<sc-if value="{{ detailOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end">
+    <div onClick="{{ closeDetail }}" style="position:absolute;inset:0;background:rgba(20,20,20,0.45)"></div>
+    <aside style="position:relative;width:min(680px,100%);height:100%;overflow-y:auto;background:#f9f8f2;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;background:#f9f8f2;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:20px clamp(20px,4vw,48px);border-bottom:1px solid #d8d5c6;z-index:1">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.15em;color:#6b6966;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;background:{{ odCc }}"></span>{{ od.category }}</span>
+        <div style="display:flex;gap:16px;font-size:13px;align-items:center">
+          <span onClick="{{ restructure }}" style="cursor:pointer;text-decoration:underline">{{ restructLabel }}</span>
+          <span onClick="{{ editOpen }}" style="cursor:pointer;text-decoration:underline">편집</span>
+          <span onClick="{{ deleteOpen }}" style="cursor:pointer;text-decoration:underline">삭제</span>
+          <span onClick="{{ closeDetail }}" style="cursor:pointer;font-size:22px;line-height:1">×</span>
+        </div>
+      </div>
+      <div style="padding:clamp(28px,5vw,56px) clamp(20px,4vw,48px);display:flex;flex-direction:column;gap:40px">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(26px,3.4vw,36px);line-height:1.3;letter-spacing:-0.03em;text-wrap:pretty">{{ od.title }}</h2>
+          <div style="width:40px;height:2px;background:{{ accent2 }}"></div>
+          <p style="margin:0;font-size:16px;line-height:1.8;color:#2e2d2b;text-wrap:pretty">{{ od.summary }}</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ odKeywords }}" as="k" hint-placeholder-count="0">
+              <span style="font-size:12px;padding:5px 10px;border:1px solid #c9c6bf">{{ k }}</span>
+            </sc-for>
+          </div>
+        </div>
+        <sc-if value="{{ odHasBackground }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;letter-spacing:0.2em;color:#6b6966">배경</div>
+            <p style="margin:0;font-size:15px;line-height:1.85;text-wrap:pretty">{{ od.background }}</p>
+          </div>
+        </sc-if>
+        <sc-if value="{{ odHasIssues }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:11px;letter-spacing:0.2em;color:#6b6966;margin-bottom:6px">핵심 쟁점</div>
+            <sc-for list="{{ odIssues }}" as="it" hint-placeholder-count="0">
+              <div style="display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px;padding:12px 0;border-bottom:1px solid #e2dfd9">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b6966;padding-top:3px">{{ it.no }}</span>
+                <span style="font-size:15px;line-height:1.7">{{ it.t }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ odHasPersp }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:1px;background:#151515;border:1px solid #151515">
+            <div style="background:#f9f8f2;padding:22px;display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:'Noto Serif KR',serif;font-weight:700;font-size:16px">찬성 · 긍정</div>
+              <sc-for list="{{ odPro }}" as="x" hint-placeholder-count="0"><div style="font-size:14px;line-height:1.7">— {{ x }}</div></sc-for>
+            </div>
+            <div style="background:#373533;color:#f3f1e8;padding:22px;display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:'Noto Serif KR',serif;font-weight:700;font-size:16px">반대 · 우려</div>
+              <sc-for list="{{ odCon }}" as="x" hint-placeholder-count="0"><div style="font-size:14px;line-height:1.7">— {{ x }}</div></sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ odHasQs }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:11px;letter-spacing:0.2em;color:#6b6966;margin-bottom:6px">예상 질문</div>
+            <sc-for list="{{ odQs }}" as="x" hint-placeholder-count="0">
+              <div style="display:flex;justify-content:space-between;gap:16px;align-items:start;padding:12px 0;border-bottom:1px solid #e2dfd9">
+                <span style="font-family:'Noto Serif KR',serif;font-size:15px;line-height:1.7">{{ x.q }}</span>
+                <span onClick="{{ x.practice }}" style="font-size:12px;cursor:pointer;text-decoration:underline;white-space:nowrap;padding-top:4px">연습 →</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;letter-spacing:0.2em;color:#6b6966">나의 생각</div>
+          <textarea value="{{ od.myView }}" onChange="{{ onMyView }}" rows="5" placeholder="이 주제에 대한 나의 입장, 근거, 경험을 적어두세요." style="font:inherit;font-size:15px;line-height:1.8;padding:16px;background:#fff;border:1px solid #d8d5c6;outline:none;resize:vertical;color:#151515"></textarea>
+        </div>
+        <sc-if value="{{ odHasBody }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;letter-spacing:0.2em;color:#6b6966">원문 {{ odSource }}</div>
+            <div style="font-size:14px;line-height:1.85;color:#2e2d2b;white-space:pre-wrap;background:#efede9;padding:20px;max-height:420px;overflow-y:auto">{{ od.body }}</div>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button onClick="{{ toQFromDetail }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 20px;background:#151515;color:#f3f1e8;border:none;cursor:pointer">이 주제로 질문 만들기</button>
+          <button onClick="{{ toPFromDetail }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:14px 20px;background:transparent;border:1px solid #151515;cursor:pointer">제시문 만들기</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</sc-if>
+
+<sc-if value="{{ formOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div onClick="{{ closeForm }}" style="position:absolute;inset:0;background:rgba(20,20,20,0.5)"></div>
+    <div style="position:relative;width:min(640px,100%);max-height:92vh;overflow-y:auto;background:#f9f8f2;padding:clamp(24px,4vw,44px);display:flex;flex-direction:column;gap:22px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:700;font-size:24px">{{ formTitle }}</h3>
+        <span onClick="{{ closeForm }}" style="cursor:pointer;font-size:24px;line-height:1">×</span>
+      </div>
+      <div onClick="{{ pickFile }}" onDragOver="{{ onDragOver }}" onDragLeave="{{ onDragLeave }}" onDrop="{{ onDrop }}" style="border:1px dashed #151515;background:{{ dropBg }};padding:28px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;cursor:pointer">
+        <div style="font-family:'Noto Serif KR',serif;font-size:17px">{{ dropLabel }}</div>
+        <div style="font-size:12.5px;color:#6b6966;line-height:1.6">.txt · .md · .json — ‘# 제목’으로 나뉜 문서는 여러 항목으로 분리되고, AI가 요약·쟁점·관점으로 재구성합니다.</div>
+        <input ref="{{ fileRef }}" type="file" multiple accept=".txt,.md,.markdown,.json,text/plain" onChange="{{ onFileInput }}" style="display:none">
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:11px;letter-spacing:0.2em;color:#6b6966"><span style="flex:1;height:1px;background:#d8d5c6"></span>또는 직접 작성<span style="flex:1;height:1px;background:#d8d5c6"></span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;letter-spacing:0.2em;color:#6b6966">제목
+        <input value="{{ form.title }}" onChange="{{ fTitle }}" placeholder="예: 저출산과 인구절벽" style="font:inherit;font-size:16px;letter-spacing:0;padding:10px 0;background:transparent;border:none;border-bottom:1px solid #151515;outline:none;color:#151515">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;letter-spacing:0.2em;color:#6b6966">분류
+        <input value="{{ form.category }}" onChange="{{ fCategory }}" placeholder="사회 / 경제 / 환경 / 기술 …" style="font:inherit;font-size:15px;letter-spacing:0;padding:10px 0;background:transparent;border:none;border-bottom:1px solid #151515;outline:none;color:#151515">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;letter-spacing:0.2em;color:#6b6966">한 줄 요약
+        <input value="{{ form.summary }}" onChange="{{ fSummary }}" style="font:inherit;font-size:15px;letter-spacing:0;padding:10px 0;background:transparent;border:none;border-bottom:1px solid #151515;outline:none;color:#151515">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;letter-spacing:0.2em;color:#6b6966">키워드 (쉼표로 구분)
+        <input value="{{ form.keywords }}" onChange="{{ fKeywords }}" style="font:inherit;font-size:15px;letter-spacing:0;padding:10px 0;background:transparent;border:none;border-bottom:1px solid #151515;outline:none;color:#151515">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;letter-spacing:0.2em;color:#6b6966">내용
+        <textarea value="{{ form.body }}" onChange="{{ fBody }}" rows="6" placeholder="자료, 메모, 기사 내용을 붙여넣으세요." style="font:inherit;font-size:14.5px;letter-spacing:0;line-height:1.7;padding:12px;background:#fff;border:1px solid #d8d5c6;outline:none;resize:vertical;color:#151515"></textarea>
+      </label>
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+        <button onClick="{{ closeForm }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:12px 20px;background:transparent;border:1px solid #151515;cursor:pointer">취소</button>
+        <button onClick="{{ saveForm }}" style="font:inherit;white-space:nowrap;flex-shrink:0;font-size:14px;padding:12px 24px;background:#151515;color:#f3f1e8;border:none;cursor:pointer">저장</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:80;background:#151515;color:#f3f1e8;padding:12px 20px;font-size:13px">{{ toast }}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#5d6b3a&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#5d6b3a&quot;,&quot;#4e6047&quot;,&quot;#6b7a5a&quot;],&quot;section&quot;:&quot;포인트 컬러&quot;},&quot;accent2&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#5d6b3a&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#5d6b3a&quot;,&quot;#4e6047&quot;,&quot;#373533&quot;],&quot;section&quot;:&quot;포인트 컬러&quot;},&quot;cSociety&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#7a2e2e&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#7a2e2e&quot;,&quot;#8a3b34&quot;,&quot;#6b2a3a&quot;],&quot;section&quot;:&quot;분류 컬러&quot;},&quot;cEnv&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#7fa35a&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#7fa35a&quot;,&quot;#8fae5e&quot;,&quot;#6f9a6a&quot;],&quot;section&quot;:&quot;분류 컬러&quot;},&quot;cTech&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#c39a2e&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#c39a2e&quot;,&quot;#b8892b&quot;,&quot;#d0a845&quot;],&quot;section&quot;:&quot;분류 컬러&quot;},&quot;cEthics&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2f4a6b&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#2f4a6b&quot;,&quot;#1c2a3a&quot;,&quot;#3f5a78&quot;],&quot;section&quot;:&quot;분류 컬러&quot;}}">
+const LS = 'thoughtlib_entries_v1';
+const SEED = [
+ {id:'s1',category:'사회',title:'저출산과 인구절벽',summary:'합계출산율이 0.7명대까지 떨어지며 노동력 감소, 내수 위축, 연금·지역 소멸 문제가 연쇄적으로 심화되고 있다.',keywords:['합계출산율','인구구조','일·가정 양립'],background:'주거비·사교육비 부담, 장시간 노동, 경력 단절 우려, 결혼·출산에 대한 가치관 변화가 복합적으로 작용한다. 현금성 지원 중심의 정책이 효과를 거두지 못했다는 평가가 많다.',issues:['현금 지원 vs 구조 개혁(주거·노동시장) 중 무엇이 우선인가','출산을 ‘국가 과제’로 보는 시각은 개인의 선택권과 충돌하지 않는가','이민 확대가 대안이 될 수 있는가'],pro:['육아휴직·유연근무 확대는 실질적 양육 부담을 줄인다','주거 지원은 결혼 시점을 앞당기는 효과가 있다'],con:['단기 현금 지원은 재정 부담 대비 효과가 낮다','출산율 목표 중심 정책은 삶의 질 문제를 놓친다'],questions:['저출산의 가장 근본적인 원인은 무엇이라고 생각하나요?','출산 장려금 정책의 한계와 대안을 말해보세요.','이민 확대가 저출산의 해법이 될 수 있을까요?'],myView:''},
+ {id:'s2',category:'환경',title:'기후위기와 탄소중립',summary:'2050 탄소중립 목표 아래 에너지 전환이 진행 중이지만, 산업 경쟁력·일자리·비용 분담을 둘러싼 갈등이 크다.',keywords:['탄소중립','에너지 전환','정의로운 전환'],background:'한국은 제조업 비중과 화석연료 의존도가 높아 감축 부담이 크다. 탄소국경조정제도 등 국제 규제가 강화되며 산업계 대응도 시급해졌다.',issues:['원전은 탄소중립의 수단인가, 위험 요인인가','전환 과정에서 피해를 보는 노동자·지역은 누가 책임지는가','개인의 실천과 구조적 규제 중 무엇이 더 중요한가'],pro:['재생에너지 투자는 새로운 산업과 일자리를 만든다','국제 규제 대응은 수출 경쟁력과 직결된다'],con:['급격한 전환은 전기요금 상승과 산업 위축을 부른다','석탄 발전 지역의 고용 충격이 크다'],questions:['정의로운 전환이란 무엇이며 왜 필요한가요?','개인의 친환경 실천은 의미가 있다고 보나요?','원전에 대한 본인의 입장을 근거와 함께 말해보세요.'],myView:''},
+ {id:'s3',category:'기술',title:'생성형 AI와 일자리',summary:'생성형 AI가 사무·창작 영역까지 대체·보완하면서 노동시장 재편, 저작권, 교육의 방향이 새로운 쟁점이 되었다.',keywords:['생성형 AI','자동화','저작권'],background:'과거 자동화가 단순 반복 노동에 집중됐다면, 생성형 AI는 글쓰기·코딩·디자인 등 지식노동에 영향을 준다. 생산성 향상과 일자리 감소 우려가 공존한다.',issues:['AI가 만든 결과물의 저작권과 책임은 누구에게 있는가','일자리 감소에 대한 사회 안전망(재교육, 기본소득)은 충분한가','교육 현장에서 AI 사용을 허용해야 하는가'],pro:['반복 업무를 줄여 고부가가치 업무에 집중하게 한다','새로운 직무와 산업이 생겨난다'],con:['전환 속도가 빨라 재교육이 따라가지 못한다','학습 데이터의 저작권 침해 문제가 해결되지 않았다'],questions:['AI 시대에 인간에게 필요한 역량은 무엇인가요?','AI 생성물의 저작권을 인정해야 할까요?','학교에서 AI 사용을 어디까지 허용해야 할까요?'],myView:''},
+ {id:'s4',category:'사회',title:'지방소멸과 수도권 집중',summary:'인구와 일자리, 인프라가 수도권에 집중되며 지방 중소도시는 인구 감소와 고령화로 존립 위기에 놓였다.',keywords:['균형발전','청년 유출','메가시티'],background:'전체 인구의 절반 이상이 수도권에 거주한다. 지방 대학의 정원 미달, 의료 공백, 상권 붕괴가 청년 유출을 가속하는 악순환이 나타난다.',issues:['공공기관 이전은 효과가 있었는가','지역 거점 메가시티 전략 vs 고른 분산','수도권 규제는 국가 경쟁력을 해치는가'],pro:['지역 거점 대학·기업 육성은 청년 정착을 돕는다','분산은 수도권 주거·교통 문제도 완화한다'],con:['인위적 분산은 효율성을 떨어뜨린다','인프라 없이 기관만 옮기면 효과가 제한적이다'],questions:['지방소멸을 막기 위한 가장 현실적인 정책은?','청년들이 지방에 남으려면 무엇이 필요할까요?','수도권 집중은 꼭 해결해야 할 문제인가요?'],myView:''},
+ {id:'s5',category:'경제',title:'플랫폼 노동',summary:'배달·대리운전·프리랜서 플랫폼 확산으로 ‘근로자도 자영업자도 아닌’ 노동자가 늘며 보호 공백이 생겼다.',keywords:['특수고용','알고리즘 통제','사회보험'],background:'플랫폼 노동자는 근로기준법상 근로자로 인정받기 어려워 최저임금, 산재, 고용보험 적용에서 배제되기 쉽다. 알고리즘에 의한 업무 배정·평가가 사실상의 지휘·감독이라는 지적이 있다.',issues:['플랫폼 노동자를 근로자로 볼 것인가','알고리즘의 투명성을 어떻게 확보할 것인가','유연성과 안정성은 양립할 수 있는가'],pro:['원하는 시간에 일하는 유연성을 제공한다','진입 장벽이 낮아 소득 기회를 넓힌다'],con:['사고·질병 시 보호가 부족하다','수수료·평점 체계가 일방적으로 정해진다'],questions:['플랫폼 노동자도 근로자로 인정해야 할까요?','알고리즘 노동 통제의 문제점은 무엇인가요?','유연한 노동과 노동자 보호를 어떻게 조화시킬 수 있을까요?'],myView:''},
+ {id:'s6',category:'윤리',title:'표현의 자유와 혐오 표현',summary:'온라인 공간에서 특정 집단을 향한 혐오 표현이 늘며, 규제의 필요성과 표현의 자유 침해 우려가 맞선다.',keywords:['혐오 표현','플랫폼 책임','차별금지'],background:'익명성과 알고리즘 추천은 혐오 표현의 확산을 가속한다. 규제의 기준을 누가, 어떻게 정할지가 핵심 쟁점이다.',issues:['혐오 표현의 법적 정의는 가능한가','플랫폼 기업에 삭제 의무를 부과해야 하는가','규제는 자기검열을 낳는가'],pro:['혐오 표현은 실제 차별과 폭력으로 이어진다','소수자의 표현의 자유를 위축시킨다'],con:['기준이 모호하면 정당한 비판까지 막힌다','국가·기업의 검열 권한이 과도해진다'],questions:['표현의 자유는 어디까지 보장되어야 하나요?','혐오 표현 규제의 기준을 제시해보세요.','플랫폼 기업은 어떤 책임을 져야 할까요?'],myView:''},
+ {id:'s7',category:'기술',title:'디지털 격차',summary:'키오스크, 모바일 금융, 온라인 행정이 일상화되며 고령층·장애인·저소득층의 접근성 문제가 커졌다.',keywords:['디지털 포용','접근성','고령층'],background:'디지털 전환은 효율을 높이지만, 기기 사용이 어려운 사람에게는 서비스 이용 자체가 장벽이 된다. 정보 접근 격차는 경제적 격차로 이어진다.',issues:['오프라인 대안을 의무화해야 하는가','디지털 교육은 누구의 책임인가','접근성 설계(유니버설 디자인)를 강제해야 하는가'],pro:['디지털 서비스는 장기적으로 비용을 줄인다','교육 지원으로 격차를 좁힐 수 있다'],con:['교육만으로는 신체적·인지적 한계를 해결하기 어렵다','오프라인 창구 축소는 기본권 침해가 될 수 있다'],questions:['디지털 격차 해소를 위해 기업과 정부가 할 일은?','키오스크 확산에 대해 어떻게 생각하나요?','기술 발전이 불평등을 키운다는 주장에 대해 말해보세요.'],myView:''},
+ {id:'s8',category:'경제',title:'고령화와 연금개혁',summary:'초고령사회 진입으로 국민연금 기금 고갈 우려가 커지며, 보험료율·소득대체율 조정을 둘러싼 세대 간 갈등이 깊어졌다.',keywords:['국민연금','세대 갈등','노인 빈곤'],background:'노인 빈곤율이 OECD 최상위권인 동시에 연금 재정의 지속가능성도 위협받고 있다. ‘더 내고 더 받기’와 ‘더 내고 덜 받기’ 사이의 선택이 쟁점이다.',issues:['재정 안정과 노후 소득 보장 중 무엇을 우선할 것인가','청년 세대의 부담은 공정한가','정년 연장과 연금 수급 연령 조정'],pro:['보험료 인상은 기금 고갈 시점을 늦춘다','국가 지급 보장 명문화는 신뢰를 높인다'],con:['청년 세대의 부담이 과도하다','소득대체율 인하는 노인 빈곤을 심화시킨다'],questions:['연금개혁에서 세대 간 형평성을 어떻게 확보할 수 있을까요?','정년 연장에 대한 본인의 생각은?','노인 빈곤 문제의 해법을 제시해보세요.'],myView:''}
+];
+const Q_TYPES = ['기본','심화','압박','꼬리질문'];
+const P_FORMATS = ['대립 견해','칼럼','통계·자료','사례'];
+const P_LENS = ['짧게','보통','길게'];
+const PREPS = [[0,'없음'],[60,'1분'],[180,'3분'],[300,'5분'],[600,'10분']];
+const ANSS = [[60,'1분'],[90,'1분 30초'],[120,'2분'],[180,'3분'],[300,'5분']];
+
+function load(){ try{ const s=JSON.parse(localStorage.getItem(LS)); if(Array.isArray(s)&&s.length) return s; }catch(e){} return SEED; }
+function parseJSON(t){ if(!t) return null; const m=t.match(/[\[{][\s\S]*[\]}]/); try{ return JSON.parse(m?m[0]:t); }catch(e){ return null; } }
+function pad(n){ return String(n).padStart(2,'0'); }
+function uid(){ return 'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function ctx(e){ return `제목: ${e.title}\n분류: ${e.category}\n요약: ${e.summary||''}\n배경: ${e.background||''}\n쟁점: ${(e.issues||[]).join(' / ')}\n찬성: ${(e.pro||[]).join(' / ')}\n반대: ${(e.con||[]).join(' / ')}\n원문: ${(e.body||'').slice(0,3500)}`; }
+
+class Component extends DCLogic {
+  state = { entries: load(), cat:'전체', search:'', openId:null, form:null, drag:false, uploading:0, toast:'', restructuring:false,
+    qTopic:'', qType:'기본', qCount:5, qList:[], qLoading:false,
+    pTopic:'', pFormat:'대립 견해', pLen:'보통', pResult:null, pLoading:false,
+    prep:180, ans:120, phase:'idle', remain:180, running:false, tQuestion:'' };
+  libRef=React.createRef(); qRef=React.createRef(); pRef=React.createRef(); tRef=React.createRef(); fileRef=React.createRef();
+
+  componentDidMount(){
+    this.iv=setInterval(()=>{
+      const s=this.state; if(!s.running) return;
+      if(s.remain>1){ this.setState({remain:s.remain-1}); return; }
+      if(s.phase==='prep'){ this.beep(1); this.setState({phase:'answer',remain:s.ans}); }
+      else { this.beep(3); this.setState({phase:'done',remain:0,running:false}); }
+    },1000);
+  }
+  componentWillUnmount(){ clearInterval(this.iv); }
+  beep(n){ try{ const ac=this.ac||(this.ac=new (window.AudioContext||window.webkitAudioContext)()); for(let i=0;i<n;i++){ const o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=880; o.connect(g); g.connect(ac.destination); const t=ac.currentTime+i*0.28; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.22); o.start(t); o.stop(t+0.24);} }catch(e){} }
+
+  save(entries){ this.setState({entries}); try{ localStorage.setItem(LS,JSON.stringify(entries)); }catch(e){} }
+  updateEntry(id,patch){ this.save(this.state.entries.map(e=>e.id===id?{...e,...patch}:e)); }
+  flash(t){ this.setState({toast:t}); clearTimeout(this.tt); this.tt=setTimeout(()=>this.setState({toast:''}),2600); }
+  scroll(ref){ const el=ref.current; if(el) window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY,behavior:'smooth'}); }
+  async ask(prompt,max){ if(!window.claude||!window.claude.complete) return null; try{ return await window.claude.complete({messages:[{role:'user',content:prompt}],max_tokens:max||1500}); }catch(e){ return null; } }
+
+  async restructureEntry(id){
+    const e=this.state.entries.find(x=>x.id===id); if(!e) return false;
+    const r=parseJSON(await this.ask(`다음 자료를 한국 대학/취업 면접 대비용 지식 카드로 재구성해줘. 반드시 JSON 객체만 출력:\n{"title":"주제명(짧게)","category":"사회|경제|환경|기술|윤리|정치|교육|문화 중 하나","summary":"2문장 요약","keywords":["3~4개"],"background":"배경 2~3문장","issues":["핵심 쟁점 3개"],"pro":["찬성·긍정 관점 2~3개"],"con":["반대·우려 관점 2~3개"],"questions":["예상 면접 질문 3개"]}\n\n자료:\n${ctx(e)}`,2000));
+    if(!r||!r.summary) return false;
+    this.updateEntry(id,{title:r.title||e.title,category:r.category||e.category,summary:r.summary,keywords:r.keywords||[],background:r.background||'',issues:r.issues||[],pro:r.pro||[],con:r.con||[],questions:r.questions||[]});
+    return true;
+  }
+
+  async handleFiles(files){
+    const list=[...files]; if(!list.length) return;
+    this.setState({uploading:list.length});
+    const added=[];
+    for(const f of list){
+      const text=await f.text(); const base=f.name.replace(/\.[^.]+$/,'');
+      if(/\.json$/i.test(f.name)){ const j=parseJSON(text); const arr=Array.isArray(j)?j:(j?[j]:[]); arr.forEach(o=>added.push({id:uid(),category:o.category||'업로드',title:o.title||base,summary:o.summary||'',keywords:o.keywords||[],background:o.background||'',issues:o.issues||[],pro:o.pro||[],con:o.con||[],questions:o.questions||[],body:o.body||'',myView:o.myView||'',source:f.name,_raw:!o.summary})); continue; }
+      const parts=text.split(/\n(?=#\s)/).map(s=>s.trim()).filter(Boolean);
+      const chunks=parts.length>1||/^#\s/.test(text.trim())?parts:[text.trim()];
+      chunks.forEach(c=>{ let title=base, body=c; if(/^#\s/.test(c)){ const nl=c.indexOf('\n'); title=(nl<0?c:c.slice(0,nl)).replace(/^#\s*/,'').trim(); body=nl<0?'':c.slice(nl+1).trim(); }
+        added.push({id:uid(),category:'업로드',title,summary:body.replace(/\s+/g,' ').slice(0,120),keywords:[],body,myView:'',source:f.name,_raw:true}); });
+    }
+    this.save([...added.map(({_raw,...a})=>a),...this.state.entries]);
+    this.setState({form:null,cat:'전체'});
+    this.flash(`${added.length}개 항목을 추가했습니다${window.claude?' · AI 재구성 중…':''}`);
+    this.scroll(this.libRef);
+    if(window.claude){ for(const a of added.filter(a=>a._raw).slice(0,10)) await this.restructureEntry(a.id); this.flash('재구성 완료'); }
+    this.setState({uploading:0});
+  }
+
+  practice(q){ this.setState({tQuestion:q,phase:'idle',running:false,remain:this.state.prep||this.state.ans,openId:null}); this.scroll(this.tRef); }
+
+  async genQuestions(topicId){
+    const e=this.state.entries.find(x=>x.id===topicId); if(!e||this.state.qLoading) return;
+    const {qType,qCount}=this.state; this.setState({qLoading:true});
+    const guide={기본:'주제 이해와 입장을 묻는 기본 질문',심화:'원인 분석, 정책 대안, 가치 충돌을 파고드는 심화 질문',압박:'지원자 입장의 약점이나 반례를 찌르는 압박 질문',꼬리질문:'첫 질문과 그 답변을 가정해 이어지는 꼬리질문 흐름(1번이 첫 질문, 이후는 이어지는 질문)'}[qType];
+    const r=parseJSON(await this.ask(`너는 한국 대학·공공기관 면접관이다. 아래 주제로 ${guide} ${qCount}개를 만들어라. 각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`,1500));
+    let list=Array.isArray(r)?r.filter(x=>x&&x.q):null;
+    if(!list||!list.length){ const t=e.title; const base=[...(e.questions||[]),`${t}에 대해 간단히 설명하고 본인의 입장을 말해보세요.`,`${t} 문제가 발생한 가장 큰 원인은 무엇이라고 보나요?`,`${t}에 대해 반대 입장을 가진 사람을 어떻게 설득하겠습니까?`,`${t}와 관련해 본인이 직접 경험하거나 관찰한 사례가 있나요?`,`${t} 해결을 위해 정부·기업·개인이 각각 할 수 있는 일은?`,`방금 말한 해결책의 부작용은 무엇일까요?`]; list=base.slice(0,qCount).map(q=>({q,intent:'기본 템플릿 질문'})); }
+    this.setState({qList:list,qLoading:false});
+  }
+
+  async genPassage(topicId){
+    const e=this.state.entries.find(x=>x.id===topicId); if(!e||this.state.pLoading) return;
+    const {pFormat,pLen}=this.state; this.setState({pLoading:true});
+    const len={짧게:'각 제시문 250자 내외',보통:'각 제시문 450자 내외',길게:'각 제시문 700자 내외'}[pLen];
+    const fmt={'대립 견해':'서로 대립하는 두 관점의 제시문 (가), (나)','칼럼':'신문 칼럼 형식의 제시문 1개 (가)','통계·자료':'수치·조사 결과를 서술한 자료형 제시문 (가)와 해석을 담은 (나) — 수치는 예시용임을 출처에 표기','사례':'구체적 사례 제시문 (가), (나) 2개'}[pFormat];
+    const r=parseJSON(await this.ask(`한국 대학 제시문 면접 문제를 만들어라. 주제 자료를 바탕으로 ${fmt}, ${len}. 이어서 제시문을 활용하는 면접 문항 3개(요약·비교→평가→적용 순). JSON 객체만 출력: {"title":"제목","passages":[{"label":"가","source":"출처 형식(예: ○○일보 칼럼 재구성)","text":"본문"}],"questions":["문항"]}\n\n${ctx(e)}`,3000));
+    let res=r&&Array.isArray(r.passages)?r:null;
+    if(!res){ res={title:e.title,passages:[{label:'가',source:'서재 자료 재구성 · 찬성 측',text:[e.summary,e.background,...(e.pro||[])].filter(Boolean).join(' ')},{label:'나',source:'서재 자료 재구성 · 반대 측',text:(e.con||[]).join(' ')||'반대 관점 자료가 없습니다.'}].filter(p=>p.text),questions:['제시문 (가)와 (나)의 관점을 비교해 요약하시오.','두 관점 중 하나를 선택하고, 그 근거를 제시하시오.',`${e.title} 문제에 대한 본인의 해결 방안을 제시문을 활용해 말하시오.`]}; }
+    this.setState({pResult:{...res,meta:`${pFormat} · ${pLen}`},pLoading:false});
+  }
+
+  chips(arr,cur,set,dark){ return arr.map(([v,l])=>({label:l,bg:v===cur?(dark?'#f3f1e8':'#151515'):'transparent',fg:v===cur?(dark?'#151515':'#f3f1e8'):(dark?'#f3f1e8':'#151515'),onClick:()=>set(v)})); }
+
+  renderVals(){
+    const s=this.state, E=s.entries;
+    const cats=['전체',...[...new Set(E.map(e=>e.category||'기타'))]];
+    const q=s.search.trim().toLowerCase();
+    const filtered=E.filter(e=>(s.cat==='전체'||e.category===s.cat)&&(!q||[e.title,e.summary,...(e.keywords||[])].join(' ').toLowerCase().includes(q)));
+    const od=E.find(e=>e.id===s.openId)||null;
+    const qTopicId=s.qTopic&&E.some(e=>e.id===s.qTopic)?s.qTopic:(E[0]&&E[0].id);
+    const pTopicId=s.pTopic&&E.some(e=>e.id===s.pTopic)?s.pTopic:(E[0]&&E[0].id);
+    const set=k=>v=>this.setState({[k]:v});
+    const fset=k=>ev=>this.setState({form:{...s.form,[k]:ev.target.value}});
+    const total=s.phase==='answer'?s.ans:(s.phase==='prep'?s.prep:1);
+    const pct=s.phase==='idle'?0:s.phase==='done'?100:Math.round((1-s.remain/total)*100);
+    const warn=s.running&&s.remain<=10;
+    const accent=this.props.accent??'#5d6b3a';
+    const CC={사회:this.props.cSociety??'#7a2e2e',환경:this.props.cEnv??'#7fa35a',기술:this.props.cTech??'#c39a2e',윤리:this.props.cEthics??'#2f4a6b'};
+    const cc=c=>CC[c]||'#8a8780';
+    const accent2=this.props.accent2??'#5d6b3a';
+    return {
+      goLib:()=>this.scroll(this.libRef), goQ:()=>this.scroll(this.qRef), goP:()=>this.scroll(this.pRef), goT:()=>this.scroll(this.tRef),
+      libRef:this.libRef,qRef:this.qRef,pRef:this.pRef,tRef:this.tRef,fileRef:this.fileRef,
+      openNew:()=>this.setState({form:{title:'',category:'',summary:'',keywords:'',body:''}}),
+      openUpload:()=>{ this.setState({form:{title:'',category:'',summary:'',keywords:'',body:''}}); },
+      indexList:cats.slice(1).map(c=>({label:c,cc:cc(c),count:pad(E.filter(e=>e.category===c).length),go:()=>{ this.setState({cat:c}); this.scroll(this.libRef); }})),
+      search:s.search, onSearch:ev=>this.setState({search:ev.target.value}),
+      catChips:this.chips(cats.map(c=>[c,c]),s.cat,set('cat')).map(ch=>ch.label!=='전체'&&ch.label===s.cat?{...ch,bg:cc(ch.label),fg:'#fff'}:ch),
+      cards:filtered.map((e,i)=>({...e,no:pad(i+1),kw:(e.keywords||[]).slice(0,3).join(' · '),cc:cc(e.category),open:()=>this.setState({openId:e.id})})),
+      noResults:filtered.length===0,
+      topicOptions:E.map(e=>({value:e.id,label:e.title})),
+      qTopicId, onQTopic:ev=>this.setState({qTopic:ev.target.value}),
+      qTypeChips:this.chips(Q_TYPES.map(t=>[t,t]),s.qType,set('qType'),true),
+      qCountChips:this.chips([[3,'3개'],[5,'5개'],[8,'8개']],s.qCount,set('qCount'),true),
+      genQuestions:()=>this.genQuestions(qTopicId), qBtnLabel:s.qLoading?'생성 중…':'질문 생성',
+      qEmpty:s.qList.length===0, qItems:s.qList.map((x,i)=>({no:pad(i+1),q:x.q,intent:x.intent||'',practice:()=>this.practice(x.q)})),
+      pTopicId, onPTopic:ev=>this.setState({pTopic:ev.target.value}),
+      pFormatChips:this.chips(P_FORMATS.map(t=>[t,t]),s.pFormat,set('pFormat')),
+      pLenChips:this.chips(P_LENS.map(t=>[t,t]),s.pLen,set('pLen')),
+      genPassage:()=>this.genPassage(pTopicId), pBtnLabel:s.pLoading?'생성 중…':'제시문 생성',
+      pEmpty:!s.pResult, pHas:!!s.pResult, pResult:s.pResult||{}, pMeta:s.pResult?s.pResult.meta:'',
+      pPassages:s.pResult?s.pResult.passages.map(p=>({label:p.label,source:p.source||'',text:p.text})):[],
+      pQuestions:s.pResult?(s.pResult.questions||[]).map((x,i)=>({no:pad(i+1),q:x,practice:()=>this.practice(x)})):[],
+      tQuestion:s.tQuestion, onTQuestion:ev=>this.setState({tQuestion:ev.target.value}),
+      randomQ:()=>{ const all=E.flatMap(e=>e.questions||[]).concat(s.qList.map(x=>x.q)); if(all.length) this.practice(all[Math.floor(Math.random()*all.length)]); },
+      tPhaseLabel:{idle:'대기',prep:'준비 시간',answer:'답변 시간',done:'종료'}[s.phase]+(s.phase!=='idle'&&s.phase!=='done'&&!s.running?' · 일시정지':''),
+      tDot:s.phase==='answer'?accent:s.phase==='prep'?accent2:'#c9c6bf', tBar:s.phase==='prep'?accent2:accent,
+      tColor:warn?accent:'#151515',
+      tDisplay:`${pad(Math.floor(s.remain/60))}:${pad(s.remain%60)}`, tPct:pct,
+      tStartLabel:s.running?'일시정지':(s.phase==='idle'||s.phase==='done'?'시작':'계속'),
+      tStart:()=>{ if(s.phase==='idle'||s.phase==='done'){ const p=s.prep>0?'prep':'answer'; this.setState({phase:p,remain:p==='prep'?s.prep:s.ans,running:true}); } else this.setState({running:!s.running}); },
+      tSkip:()=>this.setState({phase:'answer',remain:s.ans,running:true}),
+      tReset:()=>this.setState({phase:'idle',running:false,remain:s.prep||s.ans}),
+      prepChips:this.chips(PREPS,s.prep,v=>this.setState(st=>({prep:v,remain:st.phase==='idle'?(v||st.ans):st.remain})),true),
+      ansChips:this.chips(ANSS,s.ans,v=>this.setState(st=>({ans:v,remain:st.phase==='idle'&&!st.prep?v:st.remain})),true),
+      detailOpen:!!od, od:od||{}, odCc:od?cc(od.category):'', closeDetail:()=>this.setState({openId:null}),
+      odKeywords:od?(od.keywords||[]):[], odHasBackground:!!(od&&od.background),
+      odHasIssues:!!(od&&od.issues&&od.issues.length), odIssues:od?(od.issues||[]).map((t,i)=>({no:pad(i+1),t})):[],
+      odHasPersp:!!(od&&((od.pro||[]).length||(od.con||[]).length)), odPro:od?(od.pro||[]):[], odCon:od?(od.con||[]):[],
+      odHasQs:!!(od&&od.questions&&od.questions.length), odQs:od?(od.questions||[]).map(q=>({q,practice:()=>this.practice(q)})):[],
+      odHasBody:!!(od&&od.body), odSource:od&&od.source?`· ${od.source}`:'',
+      onMyView:ev=>this.updateEntry(od.id,{myView:ev.target.value}),
+      restructLabel:s.restructuring?'재구성 중…':'AI 재구성',
+      restructure:async()=>{ if(s.restructuring||!od) return; this.setState({restructuring:true}); const ok=await this.restructureEntry(od.id); this.setState({restructuring:false}); this.flash(ok?'재구성했습니다':'재구성에 실패했습니다'); },
+      editOpen:()=>this.setState({form:{id:od.id,title:od.title,category:od.category,summary:od.summary||'',keywords:(od.keywords||[]).join(', '),body:od.body||''}}),
+      deleteOpen:()=>{ if(confirm(`‘${od.title}’ 항목을 삭제할까요?`)){ this.save(E.filter(e=>e.id!==od.id)); this.setState({openId:null}); } },
+      toQFromDetail:()=>{ this.setState({qTopic:od.id,openId:null}); this.scroll(this.qRef); },
+      toPFromDetail:()=>{ this.setState({pTopic:od.id,openId:null}); this.scroll(this.pRef); },
+      formOpen:!!s.form, form:s.form||{}, formTitle:s.form&&s.form.id?'항목 편집':'새 항목',
+      closeForm:()=>this.setState({form:null}),
+      fTitle:fset('title'),fCategory:fset('category'),fSummary:fset('summary'),fKeywords:fset('keywords'),fBody:fset('body'),
+      pickFile:()=>this.fileRef.current&&this.fileRef.current.click(),
+      onFileInput:ev=>{ this.handleFiles(ev.target.files); ev.target.value=''; },
+      onDragOver:ev=>{ ev.preventDefault(); if(!s.drag) this.setState({drag:true}); },
+      onDragLeave:()=>this.setState({drag:false}),
+      onDrop:ev=>{ ev.preventDefault(); this.setState({drag:false}); this.handleFiles(ev.dataTransfer.files); },
+      dropBg:s.drag?'#e8e6e1':'transparent', dropLabel:s.uploading?'불러오는 중…':'파일을 끌어다 놓거나 클릭해 업로드',
+      saveForm:()=>{ const f=s.form; if(!f.title.trim()){ this.flash('제목을 입력하세요'); return; }
+        const kw=f.keywords.split(',').map(x=>x.trim()).filter(Boolean);
+        const patch={title:f.title.trim(),category:f.category.trim()||'기타',summary:f.summary.trim()||f.body.replace(/\s+/g,' ').slice(0,120),keywords:kw,body:f.body};
+        if(f.id) this.updateEntry(f.id,patch); else this.save([{id:uid(),myView:'',...patch},...E]);
+        this.setState({form:null}); this.flash('저장했습니다'); },
+      hasToast:!!s.toast, toast:s.toast, accent, accent2
+    };
+  }
+}
+</script>
+</body>
+</html>

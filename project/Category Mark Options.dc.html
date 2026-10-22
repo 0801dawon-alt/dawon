@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>body{margin:0;background:#e9e7e1;font-family:Pretendard,sans-serif}a{color:#151515}a:hover{color:#6b6966}</style><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;500;700&family=IBM+Plex+Mono&display=swap" rel="stylesheet"></helmet>
+<section style="padding:48px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#6b6966">첫 페이지 · INDEX 카테고리 마크</span><h2 style="margin:0;font-family:'Noto Serif KR',serif;font-weight:500;font-size:26px">7b · 7c 적용 화면</h2></div>
+  <div style="display:grid;grid-template-columns:repeat(2,520px);gap:28px">
+    <sc-for list="{{ opts }}" as="o" hint-placeholder-count="4">
+      <div id="{{ o.id }}" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 8px;background:#151515;color:#f3f1e8">{{ o.id }}</span><span style="font-size:14px">{{ o.name }}</span></div>
+        <div style="background:#373533;color:#f3f1e8;padding:40px 36px;display:flex;gap:32px">
+          <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:0.3em;color:#9a9893">INDEX</div>
+          <div style="flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px">
+            <sc-for list="{{ o.rows }}" as="r" hint-placeholder-count="8">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #4b4845">
+                <span style="display:flex;align-items:center;gap:12px;font-family:'Noto Serif KR',serif;font-size:18px;font-weight:300;white-space:nowrap">{{ r.mark }}{{ r.cat }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9893">{{ r.n }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals(){
+    const e=React.createElement;
+    const CC={사회:'#a0614f',법:'#4c5870',정치:'#7a3b3b',경제:'#a88447',과학:'#4f7682',환경:'#6b7a4e',문화:'#8d6e86',국제:'#5a6e7a'};
+    const N={사회:20,법:19,정치:20,경제:19,과학:18,환경:20,문화:20,국제:20};
+    const lift=c=>`color-mix(in oklch, ${c} 78%, #f3f1e8)`;
+    const G='rgba(225,223,218,0.55)';
+    const arch=col=>e('span',{style:{width:9,height:11,flexShrink:0,borderRadius:'4.5px 4.5px 0 0',background:col}});
+    const logo=(col,line)=>e('span',{style:{position:'relative',width:13,height:13,flexShrink:0}},e('span',{style:{position:'absolute',right:0,bottom:0,width:8,height:8,borderRadius:'50%',background:col}}),e('span',{style:{position:'absolute',left:0,top:0,width:8,height:8,boxSizing:'border-box',border:'1px solid '+line}}));
+    const defs=[
+      ['7b-1','미니 아치 · 카테고리 색',c=>arch(lift(CC[c]))],
+      ['7b-2','미니 아치 · 밝은 회색 하나로',()=>arch(G)],
+      ['7c-1','미니 로고 · 원만 카테고리 색, 네모는 회색 선',c=>logo(lift(CC[c]),'#9a9893')],
+      ['7c-2','미니 로고 · 밝은 회색 하나로',()=>logo(G,'#b5b2ac')]
+    ];
+    return { opts: defs.map(([id,name,f])=>({id,name,rows:Object.keys(CC).map(c=>({cat:c,n:N[c],mark:f(c)}))})) };
+  }
+}
+</script>
+</body>
+</html>
