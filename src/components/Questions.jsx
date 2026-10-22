@@ -1,8 +1,9 @@
 import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES, Q_TYPES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
-import { ctx, pad, parseJSON } from '../lib/util.js';
+import { ctx, pad, parseJSON, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
+import { ConfirmLink } from './Detail.jsx';
 
 const TYPE_GUIDE = {
   기본: '찬반이 갈리는 지점을 짚어 지원자의 입장과 근거를 요구하는 질문',
@@ -39,7 +40,7 @@ function DarkChips({ options, value, onChange }) {
   );
 }
 
-const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, qList, setQList, onPractice, onFallback }, ref) {
+const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, qList, setQList, myQuestions, saveMyQuestions, onPractice, onFallback }, ref) {
   const [qStyle, setQStyle] = useState(Q_STYLES[0].k);
   const [qType, setQType] = useState('기본');
   const [qCount, setQCount] = useState(3);
@@ -57,7 +58,13 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
   };
   const addManual = () => {
     const q = manualText.trim(); if (!q) return;
-    setQList([...qList, { q, intent: '직접 입력한 질문' }]); setManualText('');
+    saveMyQuestions([{ id: uid(), q, date: new Date().toISOString() }, ...myQuestions]); setManualText('');
+  };
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const saveEdit = () => {
+    const q = editText.trim(); if (!q) return;
+    saveMyQuestions(myQuestions.map(x => (x.id === editId ? { ...x, q } : x))); setEditId(null);
   };
   const sub = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-2)' };
 
@@ -105,7 +112,7 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          {qList.length === 0 && (
+          {qList.length === 0 && myQuestions.length === 0 && (
             <div className="q-empty">
               <div className="q-empty-arch" />
               <span style={{ maxWidth: 300, wordBreak: 'keep-all' }}>생성된 질문이 여기에 쌓입니다. 질문 옆의 ‘연습’을 누르면 아래 타이머로 바로 넘어갑니다.</span>
@@ -121,6 +128,34 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
               <button className="btn-practice-dark" onClick={() => onPractice(x.q)}>연습 →</button>
             </div>
           ))}
+          {myQuestions.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: qList.length ? 28 : 0 }}>
+              <span style={{ ...sub, paddingBottom: 6 }}>내가 입력한 질문 · {myQuestions.length}</span>
+              {myQuestions.map((x, i) => (
+                <div key={x.id} className="q-item">
+                  <span className="mono" style={{ fontSize: 12, color: '#c9a3a0', paddingTop: 4 }}>{pad(i + 1)}</span>
+                  {editId === x.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <textarea className="manual-input" rows={3} value={editText} onChange={ev => setEditText(ev.target.value)} style={{ resize: 'vertical', lineHeight: 1.6 }} autoFocus />
+                      <div style={{ display: 'flex', gap: 14, fontSize: 12.5 }}>
+                        <span className="link" onClick={saveEdit}>저장</span>
+                        <span className="link" style={{ color: 'var(--muted-2)' }} onClick={() => setEditId(null)}>취소</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div className="q-item-q">{x.q}</div>
+                      <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: 'var(--muted-2)' }}>
+                        <span className="link" onClick={() => { setEditId(x.id); setEditText(x.q); }}>수정</span>
+                        <ConfirmLink label="삭제" armedLabel="한 번 더 누르면 삭제" onConfirm={() => saveMyQuestions(myQuestions.filter(y => y.id !== x.id))} />
+                      </div>
+                    </div>
+                  )}
+                  <button className="btn-practice-dark" onClick={() => onPractice(x.q)}>연습 →</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

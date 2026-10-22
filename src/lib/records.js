@@ -1,13 +1,14 @@
 // Answer history (attempts + trend analysis) and '나의 생각' notes for the viewer's own
 // private space in the claude.ai artifact database: data/users/<id>/<attemptId>,
-// .../analysis and .../note-<entryId>.
+// .../analysis, .../note-<entryId> and .../myquestions (questions typed in by the viewer).
 // Resolves null outside claude.ai or when this viewer cannot have one, and the
 // app then keeps history in localStorage.
 const ANALYSIS_ID = 'analysis';
 const NOTE = 'note-';
+const MYQ_ID = 'myquestions';
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
-export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, onFail }) {
+export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, onMyQuestions, onFail }) {
   const c = window.claude;
   if (!c?.use) return null;
   const [db, user] = await Promise.all([c.use('db'), c.use('user')]);
@@ -22,9 +23,10 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
   let migrated = false;
   const unsubscribe = col.onSnapshot(snap => {
     const attempts = [], notes = {};
-    let analysis = null;
+    let analysis = null, myQuestions = null;
     snap.docs.forEach(d => {
       if (d.id === ANALYSIS_ID) analysis = d.data();
+      else if (d.id === MYQ_ID) myQuestions = d.data().items || [];
       else if (d.id.startsWith(NOTE)) notes[d.id.slice(NOTE.length)] = d.data().text || '';
       else attempts.push(d.data());
     });
@@ -40,11 +42,13 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
       Object.entries(local.notes).forEach(([id, text]) => {
         if (text && !(id in notes)) { guard(col.doc(NOTE + id).set({ text })); wrote = true; }
       });
+      if (!myQuestions && local.myQuestions.length) { guard(col.doc(MYQ_ID).set({ items: local.myQuestions })); wrote = true; }
       if (wrote) return;
     }
     onAttempts(attempts.sort(byDateDesc));
     onAnalysis(analysis);
     onNotes(notes);
+    onMyQuestions(myQuestions || []);
   }, e => onFail(e));
 
   return {
@@ -52,6 +56,7 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
     remove: id => guard(col.doc(id).delete()),
     putAnalysis: an => guard(col.doc(ANALYSIS_ID).set(an)),
     putNote: (id, text) => guard(col.doc(NOTE + id).set({ text })),
+    putMyQuestions: items => guard(col.doc(MYQ_ID).set({ items })),
     unsubscribe,
   };
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CAT_ORDER } from './lib/constants.js';
 import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
-import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, loadEntries } from './lib/store.js';
+import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
 import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
@@ -72,6 +72,9 @@ export default function App() {
 
   const [qTopic, setQTopic] = useState('');
   const [qList, setQList] = useState([]);
+  // Questions the viewer typed in: [{id, q, date}], kept like answer history.
+  const [myQuestions, setMyQuestions] = useState(() => loadJSON(MYQ_KEY, []));
+  const myQRef = useRef(myQuestions); myQRef.current = myQuestions;
   const [pTopic, setPTopic] = useState('');
 
   const [tQuestion, setTQuestion] = useState('');
@@ -100,15 +103,17 @@ export default function App() {
   useEffect(() => {
     let live = true, conn = null;
     connectRecords({
-      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])) },
+      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current },
       onAttempts: list => { if (!live) return; attemptsRef.current = list; setAttempts(list); },
       onAnalysis: an => { if (live) setAnalysisState(an); },
+      onMyQuestions: list => { if (live) setMyQuestions(list); },
       // Keep text still waiting to be written so a sync never rolls back what is being typed.
       onNotes: map => { if (live) setNotes(prev => { const next = { ...map }; Object.keys(noteTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
       onFail: () => {
         if (!live || !remote.current) return;
         remote.current = null; setRecordsRemote(false);
         saveJSON(ATTEMPTS_KEY, attemptsRef.current.slice(0, 200));
+        saveJSON(MYQ_KEY, myQRef.current);
         const n = notesRef.current;
         if (n) save(list => list.map(e => (e.id in n ? { ...e, myView: n[e.id] } : e)));
         flash('Claude 계정에 저장할 수 없어 이 브라우저에 저장합니다');
@@ -127,6 +132,7 @@ export default function App() {
     const kept = new Set(next.map(a => a.id));
     prev.forEach(a => { if (!kept.has(a.id)) r.remove(a.id); });
   }, []);
+  const saveMyQuestions = list => { setMyQuestions(list); myQRef.current = list; if (remote.current) remote.current.putMyQuestions(list); else saveJSON(MYQ_KEY, list); };
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Say why a generator fell back to its template text.
@@ -249,11 +255,11 @@ export default function App() {
         page={page} setPage={p => { setPageState(p); scroll('lib'); }}
         onOpen={setOpenId} onNew={() => setForm(EMPTY_FORM)}
       />
-      <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} onPractice={practice} onFallback={onFallback} />
+      <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} myQuestions={myQuestions} saveMyQuestions={saveMyQuestions} onPractice={practice} onFallback={onFallback} />
       <Passage ref={refs.p} entries={entries} topicId={validId(pTopic)} setTopicId={setPTopic} onPractice={practice} onFallback={onFallback} flash={flash} />
       <Timer
         ref={refs.t} timer={timer} question={tQuestion} setQuestion={setTQuestion}
-        onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
+        onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q), myQuestions.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
         onStart={() => setTimer(s => {
           if (s.phase === 'idle' || s.phase === 'done') { const p = s.prep > 0 ? 'prep' : 'answer', total = p === 'prep' ? s.prep : s.ans; return { ...s, phase: p, remain: total, running: true, endsAt: Date.now() + total * 1000, leftMs: 0 }; }
           return s.running ? { ...s, running: false, leftMs: Math.max(0, s.endsAt - Date.now()), endsAt: 0 } : { ...s, running: true, endsAt: Date.now() + s.leftMs };
