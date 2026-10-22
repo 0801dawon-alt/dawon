@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { NEUTRAL, tagLinks } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
+import CASES from '../data/cases.js';
 
 const sectionLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted)' };
 
@@ -11,7 +12,10 @@ export function ConfirmLink({ label, armedLabel, onConfirm, style }) {
 }
 
 export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onMyView, onToQuestions, onToPassage }) {
-  const tags = (od.tags || od.keywords || []).slice(0, 4).map(tagLinks);
+  // Case links only where real rulings exist: 대법원 (S) and/or 헌법재판소 (C).
+  const courts = CASES[od.id] || '';
+  const keepCase = c => (c.label === '대법원 판례' ? courts.includes('S') : c.label === '헌법재판소 결정' ? courts.includes('C') : !!courts);
+  const tags = (od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
   return (
     <div className="overlay" style={{ zIndex: 50, justifyContent: 'flex-end' }}>
       <div className="overlay-dim" onClick={onClose} />
@@ -79,7 +83,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
           {tags.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <div style={sectionLabel}>관련 뉴스 · 칼럼 · 판례</div>
+                <div style={sectionLabel}>{courts ? '관련 뉴스 · 칼럼 · 판례' : '관련 뉴스 · 칼럼'}</div>
                 <div style={{ fontSize: 11.5, color: '#8a8780' }}>실시간 검색 연결 · 관련도순</div>
               </div>
               {tags.map(tg => (
@@ -95,12 +99,14 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
                       {tg.cols.map(n => <a key={n.label} className="pill-link" href={n.url} target="_blank" rel="noopener noreferrer">{n.label}</a>)}
                     </div>
                   </div>
-                  <div style={{ background: '#efede6', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ fontSize: 11, letterSpacing: '0.16em', color: 'var(--body)' }}>관련 판례 · #{tg.tag}</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {tg.cases.map(n => <a key={n.label} className="case-link" href={n.url} target="_blank" rel="noopener noreferrer">{n.label} ↗</a>)}
+                  {tg.cases.length > 0 && (
+                    <div style={{ background: '#efede6', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ fontSize: 11, letterSpacing: '0.16em', color: 'var(--body)' }}>관련 판례 · #{tg.tag}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {tg.cases.map(n => <a key={n.label} className="case-link" href={n.url} target="_blank" rel="noopener noreferrer">{n.label} ↗</a>)}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
