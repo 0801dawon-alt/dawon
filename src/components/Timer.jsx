@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import { ACCENT, ACCENT2, ANSS, PREPS } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
@@ -21,11 +21,23 @@ function PanelChips({ label, options, value, onChange }) {
 
 const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom, onStart, onSkip, onReset, setPrep, setAns }, ref) {
   const { phase, remain, running, prep, ans } = timer;
-  const total = phase === 'answer' ? ans : phase === 'prep' ? prep : 1;
-  const pct = phase === 'idle' ? 0 : phase === 'done' ? 100 : Math.round((1 - remain / total) * 100);
-  const deg = Math.round(pct * 3.6);
+  // The ring fills exactly one turn over the set prep or answer time, drawn every frame from the clock.
+  const wrapRef = useRef(null), live = useRef(timer);
+  live.current = timer;
+  useEffect(() => {
+    let raf = 0;
+    const draw = () => {
+      const s = live.current, total = (s.phase === 'prep' ? s.prep : s.ans) * 1000;
+      let f = s.phase === 'idle' ? 0 : s.phase === 'done' ? 1 : 1 - (s.running ? s.endsAt - Date.now() : s.leftMs) / total;
+      f = Math.min(1, Math.max(0, f || 0));
+      if (wrapRef.current) wrapRef.current.style.setProperty('--deg', (f * 360).toFixed(2) + 'deg');
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, []);
   const bar = phase === 'prep' ? ACCENT2 : ACCENT;
-  const ring = `conic-gradient(${bar} ${deg}deg, #e2dfd6 0deg)`;
+  const ring = `conic-gradient(${bar} var(--deg, 0deg), #e2dfd6 0deg)`;
   const warn = running && remain <= 10;
   const dot = phase === 'answer' ? ACCENT : phase === 'prep' ? ACCENT2 : '#c9c6bf';
   const paused = phase !== 'idle' && phase !== 'done' && !running;
@@ -47,7 +59,7 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(28px,5vw,64px)', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <div className="timer-ring-wrap" data-reveal="1">
+            <div className="timer-ring-wrap" data-reveal="1" ref={wrapRef}>
               <div className="timer-ring" style={{ background: ring }}>
                 <div className="timer-face">
                   <div className="timer-phase"><span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{PHASE_LABEL[phase] + (paused ? ' · 일시정지' : '')}</div>

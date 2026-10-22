@@ -75,7 +75,9 @@ export default function App() {
   const [pTopic, setPTopic] = useState('');
 
   const [tQuestion, setTQuestion] = useState('');
-  const [timer, setTimer] = useState({ prep: 300, ans: 180, phase: 'idle', remain: 300, running: false });
+  // Clock-based timer: endsAt (ms) while running, leftMs while paused; remain is the whole seconds shown.
+  const [timer, setTimer] = useState({ prep: 300, ans: 180, phase: 'idle', remain: 300, running: false, endsAt: 0, leftMs: 0 });
+  const timerRef = useRef(timer); timerRef.current = timer;
 
   const refs = { lib: useRef(null), q: useRef(null), p: useRef(null), t: useRef(null), r: useRef(null), m: useRef(null) };
   const acRef = useRef(null);
@@ -133,18 +135,21 @@ export default function App() {
   // Timer tick: prep → answer (one beep) → done (three beeps).
   useEffect(() => {
     if (!timer.running) return;
-    const id = setInterval(() => setTimer(s => {
-      if (!s.running) return s;
-      if (s.remain > 1) return { ...s, remain: s.remain - 1 };
-      if (s.phase === 'prep') { beep(acRef, 1); return { ...s, phase: 'answer', remain: s.ans }; }
-      beep(acRef, 3); return { ...s, phase: 'done', remain: 0, running: false };
-    }), 1000);
+    const commit = next => { timerRef.current = next; setTimer(next); };
+    const id = setInterval(() => {
+      const s = timerRef.current;
+      if (!s.running) return;
+      const left = s.endsAt - Date.now();
+      if (left > 0) { const r = Math.ceil(left / 1000); if (r !== s.remain) commit({ ...s, remain: r }); return; }
+      if (s.phase === 'prep') { beep(acRef, 1); commit({ ...s, phase: 'answer', remain: s.ans, endsAt: s.endsAt + s.ans * 1000 }); }
+      else { beep(acRef, 3); commit({ ...s, phase: 'done', remain: 0, running: false, endsAt: 0, leftMs: 0 }); }
+    }, 100);
     return () => clearInterval(id);
   }, [timer.running]);
 
   const practice = q => {
     setTQuestion(q); setOpenId(null);
-    setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans }));
+    setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans, endsAt: 0, leftMs: 0 }));
     scroll('t');
   };
 
@@ -250,17 +255,17 @@ export default function App() {
         ref={refs.t} timer={timer} question={tQuestion} setQuestion={setTQuestion}
         onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
         onStart={() => setTimer(s => {
-          if (s.phase === 'idle' || s.phase === 'done') { const p = s.prep > 0 ? 'prep' : 'answer'; return { ...s, phase: p, remain: p === 'prep' ? s.prep : s.ans, running: true }; }
-          return { ...s, running: !s.running };
+          if (s.phase === 'idle' || s.phase === 'done') { const p = s.prep > 0 ? 'prep' : 'answer', total = p === 'prep' ? s.prep : s.ans; return { ...s, phase: p, remain: total, running: true, endsAt: Date.now() + total * 1000, leftMs: 0 }; }
+          return s.running ? { ...s, running: false, leftMs: Math.max(0, s.endsAt - Date.now()), endsAt: 0 } : { ...s, running: true, endsAt: Date.now() + s.leftMs };
         })}
-        onSkip={() => setTimer(s => ({ ...s, phase: 'answer', remain: s.ans, running: true }))}
-        onReset={() => setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans }))}
+        onSkip={() => setTimer(s => ({ ...s, phase: 'answer', remain: s.ans, running: true, endsAt: Date.now() + s.ans * 1000, leftMs: 0 }))}
+        onReset={() => setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans, endsAt: 0, leftMs: 0 }))}
         setPrep={v => setTimer(s => ({ ...s, prep: v, remain: s.phase === 'idle' ? (v || s.ans) : s.remain }))}
         setAns={v => setTimer(s => ({ ...s, ans: v, remain: s.phase === 'idle' && !s.prep ? v : s.remain }))}
       />
       <Record
         ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
-        onFinish={() => setTimer(s => ({ ...s, phase: 'done', running: false, remain: 0 }))}
+        onFinish={() => setTimer(s => ({ ...s, phase: 'done', running: false, remain: 0, endsAt: 0, leftMs: 0 }))}
         onPractice={practice} flash={flash}
       />
       <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onPractice={practice} flash={flash} />
