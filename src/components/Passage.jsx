@@ -1,5 +1,5 @@
 import { forwardRef, useState } from 'react';
-import { LAW_GUIDE, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
+import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
 import { ask } from '../lib/ai.js';
 import { ctx, pad, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
@@ -27,6 +27,7 @@ async function generate({ title, list }, lawType, n, len) {
   const ctxs = list.map(e => ctx(e).slice(0, 900)).join('\n---\n');
   const r = parseJSON(await ask(`한국 로스쿨 구술면접 제시문 문제를 만들어라.
 ${LAW_GUIDE}
+${QUESTION_CRAFT}
 [출제 유형] ${LT.k}: ${LT.g}
 [대주제] ${title}
 이 대주제는 개별 이슈가 아니라 가치 차원의 주제다. 서로 다른 가치(예: 형평 vs 효율, 자유 vs 안전, 개인 vs 공동체)가 드러나도록, 실제 로스쿨 기출 수준보다 '조금 어렵게'(학술적 어휘, 개념어, 압축된 논증, 함축적 문장) 작성하라. 근거는 최대한 사실에 기반할 것: 실존하는 법령·헌법재판소/대법원 결정·공식 통계(통계청, OECD 등)·학자와 저서만 인용하고, 확실하지 않은 수치나 사건번호는 지어내지 말고 '약 ~', '~로 알려져 있다'로 표현하거나 생략하라. 출처 표기도 실제 존재하는 형식으로 쓴다. 사례는 만들어 써도 되고 가상이라고 밝힐 필요는 없지만 한국 현실과 맞아떨어져야 하며, 실제 기관·인물이 하지 않은 일을 했다고 쓰지 않는다. ${FORMAT_GUIDE} 제시문 ${n}개((${labels.join('), (')}))를 ${LEN_GUIDE[len]}로 작성하라. 제시문끼리 관점이 겹치지 않게 하고, 가능하면 철학·사회과학 개념이나 고전적 논의 하나를 포함하라.
