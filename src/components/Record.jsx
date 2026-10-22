@@ -57,6 +57,21 @@ const DICTATION_TIP = TOUCH ? ' 키보드의 🎤 버튼을 누르고 말하면 
   : MAC ? ' fn 키를 두 번 누르고 말하면 받아 적혀요(Mac 받아쓰기).'
   : ' Windows 키 + H를 누르고 말하면 받아 적혀요(Windows 음성 입력).';
 
+// Step-by-step dictation guide, shown under the '말로 답하기' button.
+const GUIDE = TOUCH ? [
+  ['지금 키보드에서', '🎤 마이크 버튼을 누르고 말하세요. 말한 내용이 답변 칸에 바로 받아 적혀요. 다 말했으면 ‘피드백 받기’를 누르세요.'],
+  ['아이폰인데 🎤가 없다면', '설정 → 일반 → 키보드 → ‘받아쓰기 활성화’를 켜세요. 키보드 오른쪽 아래에 🎤가 생겨요.'],
+  ['삼성 휴대폰인데 🎤가 없다면', '키보드 위쪽 툴바(⋯)에서 🎤 음성 입력을 누르거나 쉼표(,) 키를 길게 누르세요. 툴바에 없으면 ⋯에서 음성 입력 버튼을 추가하세요.'],
+  ['다른 안드로이드라면', 'Gboard 키보드 오른쪽 위의 🎤를 누르세요. 없으면 Gboard 설정 → 음성 입력을 켜세요.'],
+  ['그래도 없다면', '네이버 스마트보드 같은 다른 키보드 앱일 수 있어요. 🌐 키로 휴대폰 기본 키보드로 바꾸면 🎤가 보여요.'],
+] : MAC ? [
+  ['지금', 'fn 키를 두 번 누르고 말하세요(🎤 키가 있는 키보드라면 🎤 키). 말한 내용이 답변 칸에 받아 적혀요. 다 말했으면 fn 키를 한 번 더 누르세요.'],
+  ['받아쓰기가 안 켜진다면', '시스템 설정 → 키보드 → ‘받아쓰기’를 켜고, 언어에 한국어가 있는지 확인하세요.'],
+] : [
+  ['지금', 'Windows 키 + H를 누르면 음성 입력 창이 떠요. 말한 내용이 답변 칸에 받아 적혀요.'],
+  ['한국어로 안 받아 적힌다면', '설정 → 시간 및 언어 → 언어 및 지역에서 한국어 음성 팩을 설치하세요.'],
+];
+
 const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)' };
 
 // 05 답변 녹음·피드백. Recording starts when the timer enters the answer phase and
@@ -68,6 +83,8 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
   const [audioUrl, setAudioUrl] = useState('');
   const [curAtt, setCurAtt] = useState(null);
   const [recErr, setRecErr] = useState('');
+  const [guideOpen, setGuideOpen] = useState(false);
+  const answerRef = useRef(null);
   const [fbLoading, setFbLoading] = useState(false);
   const [fuList, setFuList] = useState([]);
   const [fuLoading, setFuLoading] = useState(false);
@@ -187,8 +204,26 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 20, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {!recOn && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button className="btn-accent" style={{ alignSelf: 'flex-start' }} onClick={() => {
+                  // Focusing inside the click opens the phone keyboard, where the 🎤 key lives.
+                  setGuideOpen(true); const el = answerRef.current;
+                  if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                }}>🎤 말로 답하기</button>
+                {guideOpen && (
+                  <div style={{ background: '#efede6', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13.5, lineHeight: 1.65 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ fontWeight: 600 }}>{TOUCH ? '키보드의 🎤 버튼으로 말하세요' : '노트북 음성 입력으로 말하세요'}</span>
+                      <span className="link" style={{ fontSize: 12.5, color: 'var(--muted)' }} onClick={() => setGuideOpen(false)}>닫기</span>
+                    </div>
+                    {GUIDE.map(([h, t]) => <div key={h}><span style={{ color: 'var(--muted)' }}>{h} · </span>{t}</div>)}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="label" style={{ color: 'var(--muted)' }}>전사 {question ? '· ' + (question.length > 40 ? question.slice(0, 40) + '…' : question) : ''}</div>
-            <textarea className="transcript" rows={9} value={liveText} onChange={ev => setLiveText(ev.target.value)}
+            <textarea ref={answerRef} className="transcript" rows={9} value={liveText} onChange={ev => setLiveText(ev.target.value)}
               placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : (IN_ARTIFACT ? '답변을 말하거나 적은 뒤 ‘피드백 받기’를 누르세요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.') + DICTATION_TIP} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{cur ? `${cur.dur}초 · ${liveText.replace(/\s/g, '').length}자` + (fb && fb.cpm ? ` · 분당 ${fb.cpm}자` : '') : ''}</span>
