@@ -13,30 +13,38 @@ const FALLBACK_FOLLOWUPS = [
   '지원자가 제시한 대안이 실제로 시행된다면 가장 먼저 생길 부작용은 무엇이며, 어떻게 보완하겠습니까?',
 ];
 const COUNTER = /(반면|하지만|반대로|물론)/;
+const REASON = /(예를 들어|예컨대|사례|때문|왜냐하면|그 결과)/;
+// Spoken Korean runs about 300 characters (spaces excluded) a minute.
+const CHARS_PER_MIN = 300;
 
 async function evaluate(at, text, entry) {
   const fl = countFillers(text), cpm = at.dur ? Math.round(text.replace(/\s/g, '').length / (at.dur / 60)) : 0;
+  const limit = at.limit || 120, target = Math.round(limit / 60 * CHARS_PER_MIN);
+  const withPassage = !!at.context;
   let fb = parseJSON(await ask(`너는 한국 로스쿨 구술면접 평가위원이다.\n${LAW_GUIDE}\n 아래는 지원자의 실제 답변을 음성 인식으로 전사한 것이다(인식 오류 가능성 감안). 엄격하고 구체적으로 평가하라.
 [질문] ${at.q}
-[답변 시간] ${at.dur}초, 분당 ${cpm}자
+${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[주어진 답변 시간] ${Math.round(limit / 60 * 10) / 10}분
+[실제 답변 시간] ${at.dur}초, 분당 ${cpm}자
 [답변 전사]
 ${text}
 ${entry ? '[참고 쟁점] ' + (entry.issues || []).join(' / ') : ''}
-평가 기준: 논리성(주장-근거 연결), 근거(구체적 사례·수치·제도), 구조(결론 선제시·두괄식·마무리), 전달력(문장 간결성, 군말, 시간 활용), 쟁점이해(대립 지점 파악, 반론 고려). 각 0~20점.
-잘한 점·고칠 점은 답변의 실제 표현을 짚어 구체적으로 쓰고, 누적 비교용 짧은 라벨(예: '결론 먼저 제시', '근거에 수치 부족', '반론 미고려', '군말 과다')을 strengthTags/weakTags에 넣어라.
-JSON만 출력: {"total":0,"scores":{"논리성":0,"근거":0,"구조":0,"전달력":0,"쟁점이해":0},"summary":"2문장 총평","strengths":["..."],"weaknesses":["..."],"better":"보완한 답변의 뼈대(3~4문장)","strengthTags":["..."],"weakTags":["..."]}`));
+평가 기준: 논리성(주장-근거 연결), 근거(주장을 뒷받침하는 이유와 사례), 구조(결론 선제시·두괄식·마무리), 전달력(문장 간결성, 군말, 시간 활용), 쟁점이해(대립 지점 파악, 반론 고려). 각 0~20점.
+${withPassage ? '제시문이 주어진 문항이다. 제시문의 내용과 표현을 정확히 인용·활용했는지를 근거와 쟁점이해 평가에 반영하라.' : '자료 없이 답하는 면접이다. 정확한 수치·통계·조문·연도까지 요구하지 말고, 상식 수준의 사례와 논리적 이유가 주장과 잘 연결되는지로 평가하라. 수치가 없다는 이유로 감점하거나 지적하지 마라.'}
+잘한 점·고칠 점은 답변의 실제 표현을 짚어 구체적으로 쓰고, 누적 비교용 짧은 라벨(예: '결론 먼저 제시', '근거와 주장 연결 약함', '반론 미고려', '군말 과다')을 strengthTags/weakTags에 넣어라.
+마지막으로 이 질문에 대한 모범답안을 실제로 말하는 문장으로 써라. 주어진 답변 시간 ${Math.round(limit / 60 * 10) / 10}분 동안 말할 분량, 즉 공백 제외 약 ${target}자에 맞추고, 결론 → 근거 2~3개 → 반론 고려 → 마무리 구조를 따른다.${withPassage ? ' 제시문을 충분히 인용·활용하라.' : ' 지어낸 통계나 수치는 쓰지 마라.'}
+JSON만 출력: {"total":0,"scores":{"논리성":0,"근거":0,"구조":0,"전달력":0,"쟁점이해":0},"summary":"2문장 총평","strengths":["..."],"weaknesses":["..."],"better":"보완한 답변의 뼈대(3~4문장)","model":"모범답안","strengthTags":["..."],"weakTags":["..."]}`));
   if (!fb || !fb.scores) {
     markUnreadable();
     // Rule-based scoring when AI is unavailable.
     const words = text.split(/\s+/).length, fn = Object.values(fl).reduce((a, b) => a + b, 0);
-    const s5 = { 논리성: 12, 근거: /\d/.test(text) ? 14 : 9, 구조: /(결론|첫째|둘째|따라서|그래서)/.test(text) ? 14 : 10, 전달력: Math.max(6, 18 - fn), 쟁점이해: COUNTER.test(text) ? 14 : 9 };
+    const s5 = { 논리성: 12, 근거: REASON.test(text) ? 14 : 10, 구조: /(결론|첫째|둘째|따라서|그래서)/.test(text) ? 14 : 10, 전달력: Math.max(6, 18 - fn), 쟁점이해: COUNTER.test(text) ? 14 : 9 };
     fb = {
       scores: s5, total: Object.values(s5).reduce((a, b) => a + b, 0),
       summary: 'Claude 평가를 받지 못해 간단한 규칙 기반으로 평가했습니다. ' + lastAiIssue(),
       strengths: words > 80 ? ['충분한 분량으로 답변했습니다'] : [],
-      weaknesses: [...(fn > 3 ? ['군말이 ' + fn + '회 사용되었습니다'] : []), ...(!/\d/.test(text) ? ['구체적 수치·사례가 없습니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
+      weaknesses: [...(fn > 3 ? ['군말이 ' + fn + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
       better: '', strengthTags: [],
-      weakTags: [...(fn > 3 ? ['군말 과다'] : []), ...(!/\d/.test(text) ? ['근거에 수치 부족'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
+      weakTags: [...(fn > 3 ? ['군말 과다'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
     };
   }
   if (typeof fb.total !== 'number') fb.total = Object.values(fb.scores).reduce((a, b) => a + (+b || 0), 0);
@@ -54,19 +62,19 @@ async function nextFollowup(at, prev) {
 const IN_ARTIFACT = inArtifact();
 const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
-const DICTATION_TIP = TOUCH ? ' 키보드의 🎤 버튼을 누르고 말하면 받아 적혀요.'
+const DICTATION_TIP = TOUCH ? ' 키보드의 마이크 버튼을 누르고 말하면 받아 적혀요.'
   : MAC ? ' fn 키를 두 번 누르고 말하면 받아 적혀요(Mac 받아쓰기).'
-  : ' Windows 노트북은 아래 ‘🎤 말로 답하기’ 안내를 따라 홈페이지에서 녹음한 뒤 붙여 넣으세요.';
+  : ' Windows 노트북은 아래 ‘말로 답하기’ 안내를 따라 홈페이지에서 녹음한 뒤 붙여 넣으세요.';
 
 // Step-by-step dictation guide, shown under the '말로 답하기' button.
 const GUIDE = TOUCH ? [
-  ['지금 키보드에서', '🎤 마이크 버튼을 누르고 말하세요. 말한 내용이 답변 칸에 바로 받아 적혀요. 다 말했으면 ‘피드백 받기’를 누르세요.'],
-  ['아이폰인데 🎤가 없다면', '설정 → 일반 → 키보드 → ‘받아쓰기 활성화’를 켜세요. 키보드 오른쪽 아래에 🎤가 생겨요.'],
-  ['삼성 휴대폰인데 🎤가 없다면', '키보드 위쪽 툴바(⋯)에서 🎤 음성 입력을 누르거나 쉼표(,) 키를 길게 누르세요. 툴바에 없으면 ⋯에서 음성 입력 버튼을 추가하세요.'],
-  ['다른 안드로이드라면', 'Gboard 키보드 오른쪽 위의 🎤를 누르세요. 없으면 Gboard 설정 → 음성 입력을 켜세요.'],
-  ['그래도 없다면', '네이버 스마트보드 같은 다른 키보드 앱일 수 있어요. 🌐 키로 휴대폰 기본 키보드로 바꾸면 🎤가 보여요.'],
+  ['지금 키보드에서', '마이크 버튼을 누르고 말하세요. 말한 내용이 답변 칸에 바로 받아 적혀요. 다 말했으면 ‘피드백 받기’를 누르세요.'],
+  ['아이폰인데 마이크가 없다면', '설정 → 일반 → 키보드 → ‘받아쓰기 활성화’를 켜세요. 키보드 오른쪽 아래에 마이크 버튼이 생겨요.'],
+  ['삼성 휴대폰인데 마이크가 없다면', '키보드 위쪽 툴바(⋯)에서 음성 입력을 누르거나 쉼표(,) 키를 길게 누르세요. 툴바에 없으면 ⋯에서 음성 입력 버튼을 추가하세요.'],
+  ['다른 안드로이드라면', 'Gboard 키보드 오른쪽 위의 마이크를 누르세요. 없으면 Gboard 설정 → 음성 입력을 켜세요.'],
+  ['그래도 없다면', '네이버 스마트보드 같은 다른 키보드 앱일 수 있어요. 🌐 키로 휴대폰 기본 키보드로 바꾸면 마이크 버튼이 보여요.'],
 ] : MAC ? [
-  ['지금', 'fn 키를 두 번 누르고 말하세요(🎤 키가 있는 키보드라면 🎤 키). 말한 내용이 답변 칸에 받아 적혀요. 다 말했으면 fn 키를 한 번 더 누르세요.'],
+  ['지금', 'fn 키를 두 번 누르고 말하세요(마이크 키가 있는 키보드라면 그 키). 말한 내용이 답변 칸에 받아 적혀요. 다 말했으면 fn 키를 한 번 더 누르세요.'],
   ['받아쓰기가 안 켜진다면', '시스템 설정 → 키보드 → ‘받아쓰기’를 켜고, 언어에 한국어가 있는지 확인하세요.'],
 ] : [
   ['Windows 노트북이라면', 'Windows 기본 음성 입력은 한국어를 지원하지 않는 경우가 많아요. 크롬에서 아래 홈페이지를 열고 ‘자동 녹음’으로 답한 뒤 ‘복사하고 Claude 피드백 받기’를 누르세요. 이 화면이 열리면 답변 칸에 붙여 넣기(Ctrl+V)만 하면 질문과 답변이 함께 들어가요.'],
@@ -80,7 +88,7 @@ const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)
 
 // 05 답변 녹음·피드백. Recording starts when the timer enters the answer phase and
 // stops (and saves an attempt) when it leaves it.
-export const Record = forwardRef(function Record({ timer, question, setQuestion, entries, attempts, saveAttempts, onFinish, onPractice, flash }, ref) {
+export const Record = forwardRef(function Record({ timer, question, setQuestion, context, entries, attempts, saveAttempts, onFinish, onPractice, flash }, ref) {
   const [recOn, setRecOn] = useState(!IN_ARTIFACT);
   const [recording, setRecording] = useState(false);
   const [liveText, setLiveText] = useState('');
@@ -93,8 +101,8 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
   const [fuList, setFuList] = useState([]);
   const [fuLoading, setFuLoading] = useState(false);
   const rec = useRef({});
-  const live = useRef({ liveText, attempts, question });
-  live.current = { liveText, attempts, question };
+  const live = useRef({});
+  live.current = { liveText, attempts, question, context, limit: timer.ans };
   const prevPhase = useRef(timer.phase);
 
   const runFeedback = async (at, text) => {
@@ -145,9 +153,9 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     if (!save) return;
     // Give the recognizer a moment to flush its final result.
     setTimeout(() => {
-      const { liveText: t, question: q } = live.current;
+      const { liveText: t, question: q, context: c, limit } = live.current;
       const text = (t || '').trim();
-      const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: q || '(질문 없음)', text, dur, fb: null };
+      const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: q || '(질문 없음)', text, dur, limit, context: c || '', fb: null };
       saveAttempts(list => [at, ...list]); setCurAtt(at.id);
       if (text) runFeedback(at, text);
     }, 700);
@@ -166,8 +174,8 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     if (fbLoading) return;
     if (cur && (cur.text === liveText || recOn)) { runFeedback(cur, liveText || cur.text || ''); return; }
     if (!liveText.trim()) { flash('먼저 답변을 녹음하거나 입력하세요'); return; }
-    const used = timer.phase === 'answer' || timer.phase === 'done' ? Math.max(0, timer.ans - timer.remain) : 0;
-    const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: question || '(질문 없음)', text: liveText, dur: used, fb: null, manual: !recOn };
+    const used = timer.phase === 'answer' || timer.phase === 'done' ? Math.max(0, timer.ans - timer.remain) + (timer.over || 0) : 0;
+    const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: question || '(질문 없음)', text: liveText, dur: used, limit: timer.ans, context: context || '', fb: null, manual: !recOn };
     saveAttempts(list => [at, ...list]); setCurAtt(at.id); setFuList([]);
     runFeedback(at, liveText);
   };
@@ -176,7 +184,9 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     if (!cur || fuLoading) return;
     setFuLoading(true);
     const q = await nextFollowup(cur, fuList);
-    setFuList([...fuList, q]); setFuLoading(false);
+    const next = [...fuList, q];
+    setFuList(next); setFuLoading(false);
+    saveAttempts(list => list.map(a => (a.id === cur.id ? { ...a, followups: next } : a)));
   };
 
   const setMode = v => { if (!v && recording) stopRec(false); setRecOn(v); };
@@ -211,14 +221,14 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
             {!recOn && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button className="btn-accent" style={{ alignSelf: 'flex-start' }} onClick={() => {
-                  // Focusing inside the click opens the phone keyboard, where the 🎤 key lives.
+                  // Focusing inside the click opens the phone keyboard, where the mic key lives.
                   setGuideOpen(true); const el = answerRef.current;
                   if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
                 }}>🎤 말로 답하기</button>
                 {guideOpen && (
                   <div style={{ background: '#efede6', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13.5, lineHeight: 1.65 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <span style={{ fontWeight: 600 }}>{TOUCH ? '키보드의 🎤 버튼으로 말하세요' : '노트북 음성 입력으로 말하세요'}</span>
+                      <span style={{ fontWeight: 600 }}>{TOUCH ? '키보드의 마이크 버튼으로 말하세요' : '노트북 음성 입력으로 말하세요'}</span>
                       <span className="link" style={{ fontSize: 12.5, color: 'var(--muted)' }} onClick={() => setGuideOpen(false)}>닫기</span>
                     </div>
                     {GUIDE.map(([h, t]) => <div key={h}><span style={{ color: 'var(--muted)' }}>{h} · </span>{t}</div>)}
@@ -272,6 +282,12 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                     <div style={{ fontSize: 14, lineHeight: 1.8, color: '#e9e6dd' }}>{fb.better}</div>
                   </div>
                 )}
+                {fb.model && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--charcoal-line)', paddingTop: 14 }}>
+                    <div style={darkLabel}>모범답안 · {Math.round((cur.limit || 120) / 60 * 10) / 10}분 분량</div>
+                    <div style={{ fontFamily: 'var(--serif)', fontSize: 14.5, lineHeight: 1.9, color: '#f3f1e8', whiteSpace: 'pre-wrap' }}>{fb.model}</div>
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: 'var(--muted-3)' }}>{fillers.length ? '말버릇: ' + fillers.map(([k, n]) => `‘${k}’ ${n}회`).join(' · ') : '말버릇 없음'}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--charcoal-line)', paddingTop: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -282,7 +298,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                     <div key={i} className="fu-item">
                       <span style={{ fontSize: 12, color: 'var(--muted-3)', paddingTop: 3, whiteSpace: 'nowrap' }}>추가질문 {i + 1}</span>
                       <span style={{ fontFamily: 'var(--serif)', fontSize: 14.5, lineHeight: 1.7, wordBreak: 'keep-all' }}>{q}</span>
-                      <button className="btn-answer" onClick={() => { setLiveText(''); setCurAtt(null); onPractice(q); }}>답변하기 →</button>
+                      <button className="btn-answer" onClick={() => { setLiveText(''); setCurAtt(null); onPractice(q, cur && cur.context); }}>답변하기 →</button>
                     </div>
                   ))}
                 </div>
@@ -294,6 +310,15 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     </section>
   );
 });
+
+function RecordBlock({ title, boxed, serif, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 11, letterSpacing: '0.16em', color: 'var(--muted)' }}>{title}</div>
+      <div style={{ fontSize: 14, lineHeight: 1.85, color: '#2e2d2b', whiteSpace: 'pre-wrap', wordBreak: 'keep-all', fontFamily: serif ? 'var(--serif)' : undefined, ...(boxed ? { background: '#efede6', padding: 16 } : {}) }}>{children}</div>
+    </div>
+  );
+}
 
 function tagCount(attempts, key) {
   const c = {};
@@ -333,7 +358,7 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
         summary: '최근 ' + list.length + '개 답변 평균 ' + avg(list) + '점입니다.',
         patterns: tagCount(attempts, 'weakTags').slice(0, 4).map(x => x.k + ' (' + x.n + '회)'),
         strengths: tagCount(attempts, 'strengthTags').slice(0, 3).map(x => x.k),
-        next: ['결론을 첫 문장에 제시하기', '근거마다 수치나 사례 하나씩 붙이기', '반대 입장을 한 번 언급하고 반박하기'],
+        next: ['결론을 첫 문장에 제시하기', '근거마다 이유나 사례 하나씩 붙이기', '반대 입장을 한 번 언급하고 반박하기'],
       };
     }
     setAnalysis({ ...r, n: list.length, date: new Date().toLocaleDateString('ko-KR') }); setLoading(false);
@@ -396,11 +421,25 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
                 <span style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: 20, textAlign: 'right' }}>{a.fb ? String(a.fb.total) : '—'}</span>
               </div>
               {openId === a.id && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 0 20px' }}>
-                  <div style={{ fontSize: 14, lineHeight: 1.85, background: '#efede6', padding: 16, whiteSpace: 'pre-wrap' }}>{a.text || '(전사 없음)'}</div>
-                  <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#2e2d2b' }}>{a.fb ? a.fb.summary : '피드백 전'}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 0 22px' }}>
+                  <RecordBlock title="질문">{a.q}</RecordBlock>
+                  <RecordBlock title={`내 답변 · ${a.dur || 0}초${a.limit ? ` / ${Math.round(a.limit / 60 * 10) / 10}분` : ''}`} boxed>{a.text || '(답변 없음)'}</RecordBlock>
+                  {a.fb ? (
+                    <>
+                      <RecordBlock title={`피드백 · ${a.fb.total}점`}>
+                        {a.fb.summary}
+                        <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{Object.entries(a.fb.scores || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}</div>
+                        {(a.fb.strengths || []).map((x, i) => <div key={'s' + i}>+ {x}</div>)}
+                        {(a.fb.weaknesses || []).map((x, i) => <div key={'w' + i}>− {x}</div>)}
+                      </RecordBlock>
+                      {a.fb.model && <RecordBlock title="모범답안" boxed serif>{a.fb.model}</RecordBlock>}
+                    </>
+                  ) : <div style={{ fontSize: 13.5, color: 'var(--muted)' }}>피드백 전</div>}
+                  {(a.followups || []).length > 0 && (
+                    <RecordBlock title="꼬리질문">{a.followups.map((q, i) => <div key={i}>{i + 1}. {q}</div>)}</RecordBlock>
+                  )}
                   <div style={{ display: 'flex', gap: 16, fontSize: 12.5 }}>
-                    <span className="link" onClick={() => onPractice(a.q)}>같은 질문 다시 연습</span>
+                    <span className="link" onClick={() => onPractice(a.q, a.context)}>같은 질문 다시 연습</span>
                     <ConfirmLink label="삭제" armedLabel="한 번 더 누르면 삭제" style={{ color: 'var(--danger)' }} onConfirm={() => saveAttempts(list => list.filter(x => x.id !== a.id))} />
                   </div>
                 </div>

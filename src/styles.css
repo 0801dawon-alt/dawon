@@ -158,7 +158,7 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .pq { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 
 /* ── timer ── */
-.timer-q { font-family: var(--serif); font-size: clamp(17px, 2vw, 22px); line-height: 1.6; padding: 12px 0; background: transparent; border: none; border-bottom: 1px solid var(--ink); outline: none; resize: vertical; color: var(--ink); }
+.timer-q { font-family: var(--serif); font-size: clamp(15px, 1.4vw, 17px); line-height: 1.6; padding: 12px 0; background: transparent; border: none; border-bottom: 1px solid var(--ink); outline: none; resize: vertical; color: var(--ink); }
 .timer-ring-wrap { position: relative; width: min(380px, 100%); aspect-ratio: 1; align-self: center; }
 .timer-ring { position: relative; z-index: 0; width: 100%; height: 100%; border-radius: 50%; padding: 3px; }
 .timer-face { width: 100%; height: 100%; border-radius: 50%; background: var(--cream); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; position: relative; }
@@ -222,3 +222,12 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
   .hero-right > .rail-label { display: none; }
   .site-header, .site-footer { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
 }
+
+/* Floating timer: follows the screen while practicing and the big timer is scrolled away. */
+.mini-timer { position: fixed; z-index: 40; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; min-width: 112px;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 8px 24px -10px rgba(0,0,0,0.3); text-align: left; }
+.mini-timer:hover { border-color: var(--ink); }
+.mini-timer-phase { display: flex; align-items: center; gap: 6px; font-size: 10.5px; letter-spacing: 0.12em; color: var(--muted); }
+.mini-timer-time { font-family: var(--sans); font-weight: 300; font-size: 24px; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.card-viewed { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--muted-4); white-space: nowrap; }

@@ -1,9 +1,46 @@
-import { forwardRef, useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { ACCENT, ACCENT2, ANSS, PREPS } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
 const PHASE_LABEL = { idle: '대기', prep: '준비 시간', answer: '답변 시간', done: '종료' };
+const OVER = '#b23a30';
+
+// What the clock shows: remaining time, or '+m:ss' in red once the answer runs over.
+export function timeLabel(t) {
+  const isOver = t.overtime || (t.phase === 'done' && t.over > 0);
+  const secs = isOver ? t.over : t.remain;
+  return {
+    isOver,
+    text: (isOver ? '+' : '') + `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`,
+    phase: t.overtime ? '시간 초과' : PHASE_LABEL[t.phase] + (t.phase !== 'idle' && t.phase !== 'done' && !t.running ? ' · 일시정지' : ''),
+  };
+}
+
+// Small box that follows the screen while a practice is running and the big timer is out of view.
+export function MiniTimer({ timer, timerRef, onClick }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const el = timerRef.current; if (!el) return;
+    const io = new IntersectionObserver(([en]) => setVisible(en.isIntersecting), { threshold: 0.25 });
+    io.observe(el); return () => io.disconnect();
+  }, [timerRef]);
+  const active = timer.phase === 'prep' || timer.phase === 'answer';
+  const t = timeLabel(timer);
+  // The browser tab shows the time too (on the homepage), for when another tab is in front.
+  useEffect(() => {
+    const base = 'Thought Library';
+    document.title = active ? `${t.text} · ${t.phase} — ${base}` : base;
+  }, [active, t.text, t.phase]);
+  if (!active || visible) return null;
+  const dot = t.isOver ? OVER : timer.phase === 'answer' ? ACCENT : ACCENT2;
+  return (
+    <button className="mini-timer" onClick={onClick} aria-label="타이머로 이동">
+      <span className="mini-timer-phase"><span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{t.phase}</span>
+      <span className="mini-timer-time" style={{ color: t.isOver ? OVER : undefined }}>{t.text}</span>
+    </button>
+  );
+}
 
 function PanelChips({ label, options, value, onChange }) {
   return (
@@ -36,11 +73,11 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
     draw();
     return () => cancelAnimationFrame(raf);
   }, []);
-  const bar = phase === 'prep' ? ACCENT2 : ACCENT;
+  const label = timeLabel(timer);
+  const bar = label.isOver ? OVER : phase === 'prep' ? ACCENT2 : ACCENT;
   const ring = `conic-gradient(${bar} var(--deg, 0deg), #e2dfd6 0deg)`;
-  const warn = running && remain <= 10;
-  const dot = phase === 'answer' ? ACCENT : phase === 'prep' ? ACCENT2 : '#c9c6bf';
-  const paused = phase !== 'idle' && phase !== 'done' && !running;
+  const warn = running && !timer.overtime && remain <= 10;
+  const dot = label.isOver ? OVER : phase === 'answer' ? ACCENT : phase === 'prep' ? ACCENT2 : '#c9c6bf';
 
   return (
     <section ref={ref} className="section" style={{ background: 'var(--cream)', paddingTop: 'clamp(56px,8vw,110px)', paddingBottom: 'clamp(40px,6vw,72px)', borderTop: '1px solid var(--line)' }}>
@@ -62,15 +99,15 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
             <div className="timer-ring-wrap" data-reveal="1" ref={wrapRef}>
               <div className="timer-ring" style={{ background: ring }}>
                 <div className="timer-face">
-                  <div className="timer-phase"><span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{PHASE_LABEL[phase] + (paused ? ' · 일시정지' : '')}</div>
-                  <div className="timer-digits" style={{ color: warn ? ACCENT : 'var(--ink)' }}>{`${pad(Math.floor(remain / 60))}:${pad(remain % 60)}`}</div>
+                  <div className="timer-phase"><span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{label.phase}</div>
+                  <div className="timer-digits" style={{ color: label.isOver ? OVER : warn ? ACCENT : 'var(--ink)' }}>{label.text}</div>
                 </div>
               </div>
               <div className="timer-blob" />
               <div className="timer-overlay" style={{ background: ring }} />
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button className="btn-solid" style={{ padding: '14px 28px', border: 'none', minWidth: 120 }} onClick={onStart}>{running ? '일시정지' : (phase === 'idle' || phase === 'done' ? '시작' : '계속')}</button>
+              <button className="btn-solid" style={{ padding: '14px 28px', border: 'none', minWidth: 120 }} onClick={onStart}>{timer.overtime ? '답변 종료' : running ? '일시정지' : (phase === 'idle' || phase === 'done' ? '시작' : '계속')}</button>
               <button className="btn-line" style={{ padding: '14px 20px' }} onClick={onSkip}>답변 시작</button>
               <button className="btn-line" style={{ padding: '14px 20px' }} onClick={onReset}>초기화</button>
             </div>

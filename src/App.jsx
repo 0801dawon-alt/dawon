@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CAT_ORDER } from './lib/constants.js';
 import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
-import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, loadEntries } from './lib/store.js';
+import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
 import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
@@ -10,7 +10,7 @@ import Library from './components/Library.jsx';
 import { DetailPanel, EntryForm } from './components/Detail.jsx';
 import Questions from './components/Questions.jsx';
 import Passage from './components/Passage.jsx';
-import Timer from './components/Timer.jsx';
+import Timer, { MiniTimer } from './components/Timer.jsx';
 import { MyPage, Record } from './components/Record.jsx';
 import Settings from './components/Settings.jsx';
 
@@ -78,8 +78,13 @@ export default function App() {
   const [pTopic, setPTopic] = useState('');
 
   const [tQuestion, setTQuestion] = useState('');
+  // Passage text when practicing a passage question, so feedback can judge its use.
+  const [tContext, setTContext] = useState('');
+  // Topics the viewer has opened, shown quietly on library cards.
+  const [viewed, setViewed] = useState(() => loadJSON(VIEWED_KEY, []));
+  const viewedRef = useRef(viewed); viewedRef.current = viewed;
   // Clock-based timer: endsAt (ms) while running, leftMs while paused; remain is the whole seconds shown.
-  const [timer, setTimer] = useState({ prep: 300, ans: 180, phase: 'idle', remain: 300, running: false, endsAt: 0, leftMs: 0 });
+  const [timer, setTimer] = useState({ prep: 300, ans: 180, phase: 'idle', remain: 300, running: false, endsAt: 0, leftMs: 0, overtime: false, over: 0 });
   const timerRef = useRef(timer); timerRef.current = timer;
 
   const refs = { lib: useRef(null), q: useRef(null), p: useRef(null), t: useRef(null), r: useRef(null), m: useRef(null) };
@@ -103,10 +108,11 @@ export default function App() {
   useEffect(() => {
     let live = true, conn = null;
     connectRecords({
-      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current },
+      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current, viewed: viewedRef.current },
       onAttempts: list => { if (!live) return; attemptsRef.current = list; setAttempts(list); },
       onAnalysis: an => { if (live) setAnalysisState(an); },
       onMyQuestions: list => { if (live) setMyQuestions(list); },
+      onViewed: ids => { if (live) setViewed(ids); },
       // Keep text still waiting to be written so a sync never rolls back what is being typed.
       onNotes: map => { if (live) setNotes(prev => { const next = { ...map }; Object.keys(noteTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
       onFail: () => {
@@ -114,6 +120,7 @@ export default function App() {
         remote.current = null; setRecordsRemote(false);
         saveJSON(ATTEMPTS_KEY, attemptsRef.current.slice(0, 200));
         saveJSON(MYQ_KEY, myQRef.current);
+        saveJSON(VIEWED_KEY, viewedRef.current);
         const n = notesRef.current;
         if (n) save(list => list.map(e => (e.id in n ? { ...e, myView: n[e.id] } : e)));
         flash('Claude 계정에 저장할 수 없어 이 브라우저에 저장합니다');
@@ -132,13 +139,19 @@ export default function App() {
     const kept = new Set(next.map(a => a.id));
     prev.forEach(a => { if (!kept.has(a.id)) r.remove(a.id); });
   }, []);
+  const openTopic = id => {
+    setOpenId(id);
+    if (viewedRef.current.includes(id)) return;
+    const ids = [...viewedRef.current, id]; viewedRef.current = ids; setViewed(ids);
+    if (remote.current) remote.current.putViewed(ids); else saveJSON(VIEWED_KEY, ids);
+  };
   const saveMyQuestions = list => { setMyQuestions(list); myQRef.current = list; if (remote.current) remote.current.putMyQuestions(list); else saveJSON(MYQ_KEY, list); };
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Say why a generator fell back to its template text.
   const onFallback = () => flash('기본 문장으로 대신했어요 · ' + (lastAiIssue() || 'Claude 답변을 받지 못했어요. 다시 눌러 주세요.'));
 
-  // Timer tick: prep → answer (one beep) → done (three beeps).
+  // Timer tick: prep → answer (one beep) → overtime (three beeps) until the answer is ended.
   useEffect(() => {
     if (!timer.running) return;
     const commit = next => { timerRef.current = next; setTimer(next); };
@@ -146,16 +159,20 @@ export default function App() {
       const s = timerRef.current;
       if (!s.running) return;
       const left = s.endsAt - Date.now();
+      // Past the answer time the clock keeps counting up (overtime) until the answer is ended.
+      if (s.overtime) { const o = Math.floor(-left / 1000); if (o !== s.over) commit({ ...s, over: o }); return; }
       if (left > 0) { const r = Math.ceil(left / 1000); if (r !== s.remain) commit({ ...s, remain: r }); return; }
       if (s.phase === 'prep') { beep(acRef, 1); commit({ ...s, phase: 'answer', remain: s.ans, endsAt: s.endsAt + s.ans * 1000 }); }
-      else { beep(acRef, 3); commit({ ...s, phase: 'done', remain: 0, running: false, endsAt: 0, leftMs: 0 }); }
+      else { beep(acRef, 3); commit({ ...s, remain: 0, overtime: true, over: 0 }); }
     }, 100);
     return () => clearInterval(id);
   }, [timer.running]);
 
-  const practice = q => {
-    setTQuestion(q); setOpenId(null);
-    setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans, endsAt: 0, leftMs: 0 }));
+  const finishTimer = s => ({ ...s, phase: 'done', running: false, endsAt: 0, leftMs: 0, overtime: false, over: s.overtime ? Math.floor((Date.now() - s.endsAt) / 1000) : 0 });
+  const idleTimer = s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans, endsAt: 0, leftMs: 0, overtime: false, over: 0 });
+  const practice = (q, ctx) => {
+    setTQuestion(q); setTContext(ctx || ''); setOpenId(null);
+    setTimer(idleTimer);
     scroll('t');
   };
 
@@ -253,7 +270,7 @@ export default function App() {
         cat={cat} setCat={c => { setCatState(c); setPageState(0); }}
         search={search} setSearch={v => { setSearchState(v); setPageState(0); }}
         page={page} setPage={p => { setPageState(p); scroll('lib'); }}
-        onOpen={setOpenId} onNew={() => setForm(EMPTY_FORM)}
+        onOpen={openTopic} viewed={viewed} onNew={() => setForm(EMPTY_FORM)}
       />
       <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} myQuestions={myQuestions} saveMyQuestions={saveMyQuestions} onPractice={practice} onFallback={onFallback} />
       <Passage ref={refs.p} entries={entries} topicId={validId(pTopic)} setTopicId={setPTopic} onPractice={practice} onFallback={onFallback} flash={flash} />
@@ -261,21 +278,23 @@ export default function App() {
         ref={refs.t} timer={timer} question={tQuestion} setQuestion={setTQuestion}
         onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q), myQuestions.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
         onStart={() => setTimer(s => {
-          if (s.phase === 'idle' || s.phase === 'done') { const p = s.prep > 0 ? 'prep' : 'answer', total = p === 'prep' ? s.prep : s.ans; return { ...s, phase: p, remain: total, running: true, endsAt: Date.now() + total * 1000, leftMs: 0 }; }
+          if (s.overtime) return finishTimer(s);
+          if (s.phase === 'idle' || s.phase === 'done') { const p = s.prep > 0 ? 'prep' : 'answer', total = p === 'prep' ? s.prep : s.ans; return { ...s, phase: p, remain: total, running: true, endsAt: Date.now() + total * 1000, leftMs: 0, overtime: false, over: 0 }; }
           return s.running ? { ...s, running: false, leftMs: Math.max(0, s.endsAt - Date.now()), endsAt: 0 } : { ...s, running: true, endsAt: Date.now() + s.leftMs };
         })}
-        onSkip={() => setTimer(s => ({ ...s, phase: 'answer', remain: s.ans, running: true, endsAt: Date.now() + s.ans * 1000, leftMs: 0 }))}
-        onReset={() => setTimer(s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans, endsAt: 0, leftMs: 0 }))}
+        onSkip={() => setTimer(s => ({ ...s, phase: 'answer', remain: s.ans, running: true, endsAt: Date.now() + s.ans * 1000, leftMs: 0, overtime: false, over: 0 }))}
+        onReset={() => setTimer(idleTimer)}
         setPrep={v => setTimer(s => ({ ...s, prep: v, remain: s.phase === 'idle' ? (v || s.ans) : s.remain }))}
         setAns={v => setTimer(s => ({ ...s, ans: v, remain: s.phase === 'idle' && !s.prep ? v : s.remain }))}
       />
       <Record
-        ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
-        onFinish={() => setTimer(s => ({ ...s, phase: 'done', running: false, remain: 0, endsAt: 0, leftMs: 0 }))}
+        ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} context={tContext} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
+        onFinish={() => setTimer(finishTimer)}
         onPractice={practice} flash={flash}
       />
       <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onPractice={practice} flash={flash} />
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
+      <MiniTimer timer={timer} timerRef={refs.t} onClick={() => scroll('t')} />
 
       {od && (
         <DetailPanel

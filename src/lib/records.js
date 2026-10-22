@@ -6,9 +6,10 @@
 const ANALYSIS_ID = 'analysis';
 const NOTE = 'note-';
 const MYQ_ID = 'myquestions';
+const VIEWED_ID = 'viewed';
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
-export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, onMyQuestions, onFail }) {
+export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, onMyQuestions, onViewed, onFail }) {
   const c = window.claude;
   if (!c?.use) return null;
   const [db, user] = await Promise.all([c.use('db'), c.use('user')]);
@@ -23,10 +24,11 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
   let migrated = false;
   const unsubscribe = col.onSnapshot(snap => {
     const attempts = [], notes = {};
-    let analysis = null, myQuestions = null;
+    let analysis = null, myQuestions = null, viewed = null;
     snap.docs.forEach(d => {
       if (d.id === ANALYSIS_ID) analysis = d.data();
       else if (d.id === MYQ_ID) myQuestions = d.data().items || [];
+      else if (d.id === VIEWED_ID) viewed = d.data().ids || [];
       else if (d.id.startsWith(NOTE)) notes[d.id.slice(NOTE.length)] = d.data().text || '';
       else attempts.push(d.data());
     });
@@ -43,12 +45,14 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
         if (text && !(id in notes)) { guard(col.doc(NOTE + id).set({ text })); wrote = true; }
       });
       if (!myQuestions && local.myQuestions.length) { guard(col.doc(MYQ_ID).set({ items: local.myQuestions })); wrote = true; }
+      if (!viewed && local.viewed.length) { guard(col.doc(VIEWED_ID).set({ ids: local.viewed })); wrote = true; }
       if (wrote) return;
     }
     onAttempts(attempts.sort(byDateDesc));
     onAnalysis(analysis);
     onNotes(notes);
     onMyQuestions(myQuestions || []);
+    onViewed(viewed || []);
   }, e => onFail(e));
 
   return {
@@ -57,6 +61,7 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
     putAnalysis: an => guard(col.doc(ANALYSIS_ID).set(an)),
     putNote: (id, text) => guard(col.doc(NOTE + id).set({ text })),
     putMyQuestions: items => guard(col.doc(MYQ_ID).set({ items })),
+    putViewed: ids => guard(col.doc(VIEWED_ID).set({ ids })),
     unsubscribe,
   };
 }

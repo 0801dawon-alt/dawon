@@ -28,7 +28,7 @@ function NumberShape({ entry, index }) {
   );
 }
 
-const Library = forwardRef(function Library({ entries, categories, cat, setCat, search, setSearch, page, setPage, onOpen, onNew }, ref) {
+const Library = forwardRef(function Library({ entries, categories, cat, setCat, search, setSearch, page, setPage, onOpen, viewed, onNew }, ref) {
   const PER_PAGE = usePerPage();
   const q = search.trim().toLowerCase();
   const filtered = entries.filter(e => (cat === '전체' || e.category === cat) && (!q || [e.title, e.summary, ...(e.keywords || [])].join(' ').toLowerCase().includes(q)));
@@ -73,6 +73,7 @@ const Library = forwardRef(function Library({ entries, categories, cat, setCat, 
               <p>{e.summary}</p>
               <div className="card-foot">
                 <span className="kw">{(e.keywords || []).slice(0, 3).join(' · ')}</span>
+                {viewed.includes(e.id) && <span className="card-viewed">✓ 읽음</span>}
                 <span className="open">열기</span>
               </div>
             </article>

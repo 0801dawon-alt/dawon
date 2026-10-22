@@ -166,7 +166,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
                     <div key={i} className="pq">
                       <span style={{ fontFamily: 'var(--serif)', fontSize: 13, whiteSpace: 'nowrap', paddingTop: 2 }}>{x.no}</span>
                       <span style={{ fontSize: 15, lineHeight: 1.7, wordBreak: 'keep-all' }}>{x.q}</span>
-                      <button className="btn-small" onClick={() => onPractice(x.q)}>연습 →</button>
+                      <button className="btn-small" onClick={() => onPractice(x.q, result.passages.map(ps => `(${ps.label}) ${ps.text}`).join('\n\n'))}>연습 →</button>
                     </div>
                   ))}
                 </div>
