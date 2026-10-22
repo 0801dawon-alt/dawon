@@ -311,7 +311,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
   );
 });
 
-function RecordBlock({ title, boxed, serif, children }) {
+export function RecordBlock({ title, boxed, serif, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ fontSize: 11, letterSpacing: '0.16em', color: 'var(--muted)' }}>{title}</div>
@@ -327,7 +327,7 @@ function tagCount(attempts, key) {
 }
 
 // 06 내 기록: running stats, repeated tags, AI trend analysis and the attempt log.
-export const MyPage = forwardRef(function MyPage({ attempts, saveAttempts, analysis, setAnalysis, savedToClaude, onPractice, flash }, ref) {
+export const MyPage = forwardRef(function MyPage({ attempts, saveAttempts, analysis, setAnalysis, savedToClaude, bookCount, onOpenBook, onPractice, flash }, ref) {
   const [openId, setOpenId] = useState(null);
   const [loading, setLoading] = useState(false);
   const F = attempts.filter(a => a.fb);
@@ -379,6 +379,13 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
           </div>
           <button onClick={analyze} style={{ fontSize: 13, padding: '12px 20px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{loading ? '분석 중…' : '누적 분석하기'}</button>
         </div>
+        <button className="qbook-open" onClick={onOpenBook}>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left' }}>
+            <span style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 18 }}>질문 모음</span>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>직접 입력한 질문과 답변한 질문 {bookCount}개 · 질문별 피드백 요약</span>
+          </span>
+          <span style={{ fontSize: 14 }}>열기 →</span>
+        </button>
         <div className="stats">
           {stats.map(st => <div key={st.k} className="stat"><span style={label}>{st.k}</span><span className="stat-v">{st.v}</span></div>)}
         </div>

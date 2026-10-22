@@ -13,6 +13,7 @@ import Passage from './components/Passage.jsx';
 import Timer, { MiniTimer } from './components/Timer.jsx';
 import { MyPage, Record } from './components/Record.jsx';
 import Settings from './components/Settings.jsx';
+import QuestionBook from './components/QuestionBook.jsx';
 
 const EMPTY_FORM = { title: '', category: '', summary: '', keywords: '', body: '' };
 const INTRO_MS = 3400;
@@ -66,6 +67,7 @@ export default function App() {
   const [uploading, setUploading] = useState(0);
   const [restructuring, setRestructuring] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
   const [aiOn, setAiOn] = useState(hasApiKey);
   useEffect(() => { const id = setTimeout(() => setAiOn(hasApiKey()), 1500); return () => clearTimeout(id); }, []);
   const [toast, setToast] = useState('');
@@ -292,7 +294,8 @@ export default function App() {
         onFinish={() => setTimer(finishTimer)}
         onPractice={practice} flash={flash}
       />
-      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onPractice={practice} flash={flash} />
+      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onOpenBook={() => setBookOpen(true)}
+        bookCount={new Set([...myQuestions.map(x => x.q.trim()), ...attempts.filter(a => a.q && a.q !== '(질문 없음)').map(a => a.q.trim())]).size} onPractice={practice} flash={flash} />
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
       <MiniTimer timer={timer} timerRef={refs.t} onClick={() => scroll('t')} />
 
@@ -316,6 +319,7 @@ export default function App() {
       )}
       {form && <EntryForm form={form} setForm={setForm} uploading={uploading} onClose={() => setForm(null)} onSave={saveForm} onFiles={handleFiles} />}
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} onSaved={msg => { setAiOn(hasApiKey()); setSettingsOpen(false); flash(msg); }} />}
+      {bookOpen && <QuestionBook myQuestions={myQuestions} attempts={attempts} onClose={() => setBookOpen(false)} onPractice={(q, c) => { setBookOpen(false); practice(q, c); }} />}
       <Toast text={toast} />
       {intro && <Intro onSkip={() => setIntro(false)} />}
     </div>
