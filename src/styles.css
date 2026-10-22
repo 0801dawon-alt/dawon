@@ -133,8 +133,8 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .field-label { display: flex; flex-direction: column; gap: 8px; font-size: 11px; letter-spacing: 0.2em; }
 .select-dark { font: inherit; font-size: 16px; letter-spacing: 0; padding: 12px 0; background: transparent; color: var(--cream); border: none; border-bottom: 1px solid var(--cream); outline: none; }
 .select-dark option { color: var(--ink); }
-.btn-manual { font-size: 14px; padding: 16px 22px; background: #c9a3a0; color: #2a1e1d; border: none; font-weight: 600; }
-.btn-manual:hover { background: #d6b4b1; }
+.btn-manual { font-size: 14px; padding: 16px 22px; background: var(--burgundy); color: var(--cream); border: none; font-weight: 600; }
+.btn-manual:hover { filter: brightness(1.12); }
 .manual-input { font: inherit; flex: 1; min-width: 0; font-size: 14px; padding: 12px 0; background: transparent; color: var(--cream); border: none; border-bottom: 1px solid #c9a3a0; outline: none; }
 .manual-add { font-size: 13px; padding: 0 16px; background: transparent; color: var(--cream); border: 1px solid #c9a3a0; }
 .q-empty { flex: 1; min-height: clamp(280px, 50vw, 420px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; font-size: 14px; line-height: 1.7; color: var(--muted-2); }
