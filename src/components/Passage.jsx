@@ -1,6 +1,6 @@
 import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
-import { ask } from '../lib/ai.js';
+import { ask, markUnreadable } from '../lib/ai.js';
 import { ctx, pad, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
@@ -36,6 +36,7 @@ ${QUESTION_CRAFT}
 ${ctxs || '(없음)'}
 JSON 객체만 출력: {"title":"제시문 세트 제목","passages":[{"label":"가","source":"출처 형식(예: ○○일보 칼럼 재구성)","text":"본문"}],"questions":["문항"],"followups":["꼬리질문"]}`));
   if (r && Array.isArray(r.passages) && r.passages.length) return { res: r, ai: true };
+  markUnreadable();
   const pool = list.flatMap(e => [...(e.pro || []).map(x => [e, x]), ...(e.con || []).map(x => [e, x])]);
   const passages = labels.map((label, i) => {
     const e = list[i % Math.max(1, list.length)];

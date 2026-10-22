@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { ACCENT, CLAUDE_URL, HOMEPAGE_URL, LAW_GUIDE, QUESTION_CRAFT } from '../lib/constants.js';
-import { ask, inArtifact } from '../lib/ai.js';
+import { ask, inArtifact, lastAiIssue, markUnreadable } from '../lib/ai.js';
 import { countFillers, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
@@ -26,12 +26,13 @@ ${entry ? '[참고 쟁점] ' + (entry.issues || []).join(' / ') : ''}
 잘한 점·고칠 점은 답변의 실제 표현을 짚어 구체적으로 쓰고, 누적 비교용 짧은 라벨(예: '결론 먼저 제시', '근거에 수치 부족', '반론 미고려', '군말 과다')을 strengthTags/weakTags에 넣어라.
 JSON만 출력: {"total":0,"scores":{"논리성":0,"근거":0,"구조":0,"전달력":0,"쟁점이해":0},"summary":"2문장 총평","strengths":["..."],"weaknesses":["..."],"better":"보완한 답변의 뼈대(3~4문장)","strengthTags":["..."],"weakTags":["..."]}`));
   if (!fb || !fb.scores) {
+    markUnreadable();
     // Rule-based scoring when AI is unavailable.
     const words = text.split(/\s+/).length, fn = Object.values(fl).reduce((a, b) => a + b, 0);
     const s5 = { 논리성: 12, 근거: /\d/.test(text) ? 14 : 9, 구조: /(결론|첫째|둘째|따라서|그래서)/.test(text) ? 14 : 10, 전달력: Math.max(6, 18 - fn), 쟁점이해: COUNTER.test(text) ? 14 : 9 };
     fb = {
       scores: s5, total: Object.values(s5).reduce((a, b) => a + b, 0),
-      summary: 'AI 평가를 사용할 수 없어 간단한 규칙 기반으로 평가했습니다.',
+      summary: 'Claude 평가를 받지 못해 간단한 규칙 기반으로 평가했습니다. ' + lastAiIssue(),
       strengths: words > 80 ? ['충분한 분량으로 답변했습니다'] : [],
       weaknesses: [...(fn > 3 ? ['군말이 ' + fn + '회 사용되었습니다'] : []), ...(!/\d/.test(text) ? ['구체적 수치·사례가 없습니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
       better: '', strengthTags: [],

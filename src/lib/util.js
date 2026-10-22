@@ -2,8 +2,17 @@ import { FILLERS } from './constants.js';
 
 export function parseJSON(t) {
   if (!t) return null;
-  const m = t.match(/[\[{][\s\S]*[\]}]/);
-  try { return JSON.parse(m ? m[0] : t); } catch { return null; }
+  const tries = [t.trim()];
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) tries.push(fence[1]);
+  // Start from whichever bracket opens first, so an object's inner array is never taken alone.
+  const pairs = [['[', ']'], ['{', '}']].filter(([o]) => t.includes(o)).sort((x, y) => t.indexOf(x[0]) - t.indexOf(y[0]));
+  for (const [o, c] of pairs) {
+    const a = t.indexOf(o), b = t.lastIndexOf(c);
+    if (b > a) tries.push(t.slice(a, b + 1));
+  }
+  for (const s of tries) { try { return JSON.parse(s); } catch { /* try next */ } }
+  return null;
 }
 
 export const pad = n => String(n).padStart(2, '0');

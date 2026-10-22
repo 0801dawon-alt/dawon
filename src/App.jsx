@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CAT_ORDER } from './lib/constants.js';
-import { ask, hasApiKey } from './lib/ai.js';
+import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
 import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
@@ -80,12 +80,11 @@ export default function App() {
   const refs = { lib: useRef(null), q: useRef(null), p: useRef(null), t: useRef(null), r: useRef(null), m: useRef(null) };
   const acRef = useRef(null);
   const toastT = useRef(0);
-  const fallbackNoticed = useRef(false);
 
   useReveal(t0, introRef);
   useEffect(() => { const id = setTimeout(() => setIntro(false), INTRO_MS); return () => clearTimeout(id); }, []);
 
-  const flash = useCallback(t => { setToast(t); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(''), 2600); }, []);
+  const flash = useCallback(t => { setToast(t); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(''), Math.max(2600, t.length * 70)); }, []);
   const scroll = key => scrollToEl(refs[key].current);
   const save = useCallback(next => setEntries(prev => { const v = typeof next === 'function' ? next(prev) : next; saveJSON(ENTRIES_KEY, v); return v; }), []);
   // History goes to the viewer's private space on claude.ai when available, else this browser.
@@ -128,12 +127,8 @@ export default function App() {
   }, []);
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
-  // Point out the settings once when a generator falls back to templates for lack of a key.
-  const onFallback = () => {
-    if (hasApiKey() || fallbackNoticed.current) return;
-    fallbackNoticed.current = true;
-    flash('AI 키가 없어 기본 문장으로 만들었어요 · 맨 아래 ‘AI 설정’에서 연결할 수 있어요');
-  };
+  // Say why a generator fell back to its template text.
+  const onFallback = () => flash('기본 문장으로 대신했어요 · ' + (lastAiIssue() || 'Claude 답변을 받지 못했어요. 다시 눌러 주세요.'));
 
   // Timer tick: prep → answer (one beep) → done (three beeps).
   useEffect(() => {
