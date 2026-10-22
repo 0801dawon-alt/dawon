@@ -37,7 +37,7 @@ export const P_MODES=[['서재','서재 주제'],['가치','가치 주제'],['�
 export const P_FORMATS = ['대립 견해','칼럼','통계·자료','사례'];
 export const P_LENS = ['짧게','보통','길게'];
 export const PREPS = [[0,'없음'],[60,'1분'],[300,'5분'],[600,'10분'],[1200,'20분']];
-export const ANSS = [[60,'1분'],[180,'3분'],[300,'5분'],[480,'8분'],[600,'10분']];
+export const ANSS = [[60,'1분'],[120,'2분'],[180,'3분'],[300,'5분'],[480,'8분'],[600,'10분']];
 export const NV=(q,oid)=>'https://search.naver.com/search.naver?where=news&sort=0&query='+encodeURIComponent(q)+(oid?'&mynews=1&office_type=1&news_office_checked='+oid:'');
 export const NS=(q)=>'https://search.naver.com/search.naver?query='+encodeURIComponent(q);
 export const OUTLETS=[['전체',''],['KBS','1056'],['MBC','1214'],['SBS','1055'],['연합뉴스','1001'],['조선일보','1023'],['중앙일보','1025'],['동아일보','1020'],['한겨레','1028'],['경향신문','1032'],['한국일보','1469']];
