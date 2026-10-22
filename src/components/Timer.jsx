@@ -31,7 +31,7 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
   const paused = phase !== 'idle' && phase !== 'done' && !running;
 
   return (
-    <section ref={ref} className="section" style={{ background: 'var(--cream)', padding: 'clamp(56px,8vw,110px) clamp(16px,4vw,56px) clamp(40px,6vw,72px) 0', borderTop: '1px solid var(--line)' }}>
+    <section ref={ref} className="section" style={{ background: 'var(--cream)', paddingTop: 'clamp(56px,8vw,110px)', paddingBottom: 'clamp(40px,6vw,72px)', borderTop: '1px solid var(--line)' }}>
       <Rail no="04" label="TIMER" numColor="#c9c6bf" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'flex-end' }}>

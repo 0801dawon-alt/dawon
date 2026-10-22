@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CAT_ORDER } from './lib/constants.js';
 import { ask, hasApiKey } from './lib/ai.js';
 import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, loadEntries } from './lib/store.js';
+import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
 import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
 import Hero from './components/Hero.jsx';
@@ -87,8 +88,37 @@ export default function App() {
   const flash = useCallback(t => { setToast(t); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(''), 2600); }, []);
   const scroll = key => scrollToEl(refs[key].current);
   const save = useCallback(next => setEntries(prev => { const v = typeof next === 'function' ? next(prev) : next; saveJSON(ENTRIES_KEY, v); return v; }), []);
-  const saveAttempts = useCallback(next => setAttempts(prev => { const v = next(prev); saveJSON(ATTEMPTS_KEY, v.slice(0, 200)); return v; }), []);
-  const setAnalysis = an => { setAnalysisState(an); saveJSON(ANALYSIS_KEY, an); };
+  // History goes to the viewer's private space on claude.ai when available, else this browser.
+  const attemptsRef = useRef(attempts); attemptsRef.current = attempts;
+  const remote = useRef(null);
+  const [recordsRemote, setRecordsRemote] = useState(false);
+  useEffect(() => {
+    let live = true, conn = null;
+    connectRecords({
+      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null) },
+      onAttempts: list => { if (!live) return; attemptsRef.current = list; setAttempts(list); },
+      onAnalysis: an => { if (live) setAnalysisState(an); },
+      onFail: () => {
+        if (!live || !remote.current) return;
+        remote.current = null; setRecordsRemote(false);
+        saveJSON(ATTEMPTS_KEY, attemptsRef.current.slice(0, 200));
+        flash('Claude 계정에 저장할 수 없어 이 브라우저에 저장합니다');
+      },
+    }).then(r => { if (!live) { r && r.unsubscribe(); return; } conn = r; if (r) { remote.current = r; setRecordsRemote(true); } })
+      .catch(() => {});
+    return () => { live = false; conn && conn.unsubscribe(); remote.current = null; };
+  }, [flash]);
+  const saveAttempts = useCallback(fn => {
+    const prev = attemptsRef.current, next = fn(prev).slice(0, 200);
+    attemptsRef.current = next; setAttempts(next);
+    const r = remote.current;
+    if (!r) { saveJSON(ATTEMPTS_KEY, next); return; }
+    const before = new Map(prev.map(a => [a.id, a]));
+    next.forEach(a => { if (before.get(a.id) !== a) r.put(a); });
+    const kept = new Set(next.map(a => a.id));
+    prev.forEach(a => { if (!kept.has(a.id)) r.remove(a.id); });
+  }, []);
+  const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Point out the settings once when a generator falls back to templates for lack of a key.
   const onFallback = () => {
@@ -221,7 +251,7 @@ export default function App() {
         onFinish={() => setTimer(s => ({ ...s, phase: 'done', running: false, remain: 0 }))}
         onPractice={practice} flash={flash}
       />
-      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} onPractice={practice} flash={flash} />
+      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onPractice={practice} flash={flash} />
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
 
       {od && (

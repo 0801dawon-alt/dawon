@@ -136,7 +136,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <div className="arch" style={{ width: open ? 880 : 350, minHeight: open ? 600 : 440, borderRadius: open ? '440px 440px 0 0' : '175px 175px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
+          <div className="arch" style={{ width: open ? 880 : 350, minHeight: open ? 600 : 440, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
             {showEmpty && (
               <div className="arch-empty">
                 <div style={{ fontFamily: 'var(--serif)', fontSize: 19 }}>{loading ? '제시문을 쓰는 중…' : '아직 제시문이 없습니다'}</div>

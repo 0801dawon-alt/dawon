@@ -1,10 +1,18 @@
-import { forwardRef } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { catColor } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
-// 8 per page fills every row at 4, 2 or 1 columns (see .card-grid).
-const PER_PAGE = 8;
+// 8 per page fills every row at 4 or 2 columns (see .card-grid); phones show 4.
+const PHONE = '(max-width: 640px)';
+function usePerPage() {
+  const [phone, setPhone] = useState(() => window.matchMedia(PHONE).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE), on = () => setPhone(mq.matches);
+    mq.addEventListener('change', on); return () => mq.removeEventListener('change', on);
+  }, []);
+  return phone ? 4 : 8;
+}
 // Number backdrops: [border-radius, width, height, rotation]. Kept near-circular so
 // the category label lines up across cards.
 const SHAPES = [['50%', 56, 56, 0], ['28px 28px 0 0', 52, 56, 0], ['6px', 52, 52, 8], ['999px', 52, 58, 0], ['18px', 54, 54, 45], ['50% 0', 54, 54, 0], ['0 0 28px 28px', 56, 50, 0], ['50%', 56, 52, -6], ['16px 4px', 50, 58, 0]];
@@ -21,6 +29,7 @@ function NumberShape({ entry, index }) {
 }
 
 const Library = forwardRef(function Library({ entries, categories, cat, setCat, search, setSearch, page, setPage, onOpen, onNew }, ref) {
+  const PER_PAGE = usePerPage();
   const q = search.trim().toLowerCase();
   const filtered = entries.filter(e => (cat === '전체' || e.category === cat) && (!q || [e.title, e.summary, ...(e.keywords || [])].join(' ').toLowerCase().includes(q)));
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));

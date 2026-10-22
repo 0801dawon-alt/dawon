@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { ACCENT, LAW_GUIDE } from '../lib/constants.js';
-import { ask } from '../lib/ai.js';
+import { ask, inArtifact } from '../lib/ai.js';
 import { countFillers, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
@@ -49,12 +49,17 @@ async function nextFollowup(at, prev) {
   return q || FALLBACK_FOLLOWUPS.find(x => !prev.includes(x)) || FALLBACK_FOLLOWUPS[0];
 }
 
+// claude.ai pages cannot use the microphone; phones can still dictate through the keyboard.
+const IN_ARTIFACT = inArtifact();
+const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+const DICTATION_TIP = TOUCH ? ' 휴대폰 키보드의 🎤 음성 입력을 누르고 말하면 받아 적혀요.' : '';
+
 const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)' };
 
 // 05 답변 녹음·피드백. Recording starts when the timer enters the answer phase and
 // stops (and saves an attempt) when it leaves it.
 export const Record = forwardRef(function Record({ timer, question, entries, attempts, saveAttempts, onFinish, onPractice, flash }, ref) {
-  const [recOn, setRecOn] = useState(true);
+  const [recOn, setRecOn] = useState(!IN_ARTIFACT);
   const [recording, setRecording] = useState(false);
   const [liveText, setLiveText] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
@@ -88,7 +93,7 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
       r.mr.ondataavailable = e => e.data.size && r.chunks.push(e.data);
       r.mr.onstop = () => { setAudioUrl(URL.createObjectURL(new Blob(r.chunks, { type: r.mr.mimeType || 'audio/webm' }))); r.stream.getTracks().forEach(t => t.stop()); };
       r.mr.start();
-    } catch { err = '마이크 권한이 없어 녹음은 생략됩니다'; }
+    } catch { err = IN_ARTIFACT ? 'claude.ai 화면에서는 마이크를 쓸 수 없어 녹음은 생략됩니다' : '마이크 권한이 없어 녹음은 생략됩니다'; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setRecErr((err ? err + ' · ' : '') + '이 브라우저는 실시간 전사를 지원하지 않아요(크롬 권장). 답변 후 직접 입력할 수 있어요'); return; }
     if (err) setRecErr(err);
@@ -153,10 +158,10 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
   const setMode = v => { if (!v && recording) stopRec(false); setRecOn(v); };
   const recStatus = recording
     ? '녹음·전사 중… 답변이 끝나면 ‘답변 종료’를 누르거나 시간이 다 되길 기다리세요'
-    : (recErr || (recOn ? '타이머의 답변 시간이 시작되면 자동으로 녹음됩니다' : '직접 작성 모드 · 녹음 없이 타이머를 보며 답변을 적어보세요'));
+    : (recErr || (recOn ? '타이머의 답변 시간이 시작되면 자동으로 녹음됩니다' : (IN_ARTIFACT ? 'claude.ai 화면에서는 녹음 대신 답변을 적어 피드백을 받아요.' + DICTATION_TIP : '직접 작성 모드 · 녹음 없이 타이머를 보며 답변을 적어보세요')));
 
   return (
-    <section ref={ref} className="section" style={{ background: 'var(--cream)', padding: 'clamp(48px,7vw,96px) clamp(16px,4vw,56px) clamp(48px,7vw,96px) 0', borderTop: '1px solid var(--line)' }}>
+    <section ref={ref} className="section" style={{ background: 'var(--cream)', paddingBlock: 'clamp(48px,7vw,96px)', borderTop: '1px solid var(--line)' }}>
       <Rail no="05" label="RECORD" numColor="#c9c6bf" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap' }}>
@@ -180,7 +185,7 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="label" style={{ color: 'var(--muted)' }}>전사 {question ? '· ' + (question.length > 40 ? question.slice(0, 40) + '…' : question) : ''}</div>
             <textarea className="transcript" rows={9} value={liveText} onChange={ev => setLiveText(ev.target.value)}
-              placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : '녹음이 어려울 땐 여기에 답변을 직접 적고 ‘피드백 받기’를 누르세요.'} />
+              placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.' + DICTATION_TIP} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{cur ? `${cur.dur}초 · ${liveText.replace(/\s/g, '').length}자` + (fb && fb.cpm ? ` · 분당 ${fb.cpm}자` : '') : ''}</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -245,7 +250,7 @@ function tagCount(attempts, key) {
 }
 
 // 06 내 기록: running stats, repeated tags, AI trend analysis and the attempt log.
-export const MyPage = forwardRef(function MyPage({ attempts, saveAttempts, analysis, setAnalysis, onPractice, flash }, ref) {
+export const MyPage = forwardRef(function MyPage({ attempts, saveAttempts, analysis, setAnalysis, savedToClaude, onPractice, flash }, ref) {
   const [openId, setOpenId] = useState(null);
   const [loading, setLoading] = useState(false);
   const F = attempts.filter(a => a.fb);
@@ -286,13 +291,14 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
   const fmt = d => new Date(d).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) + ' ' + new Date(d).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
   return (
-    <section ref={ref} className="section" style={{ background: 'var(--paper)', padding: 'clamp(48px,7vw,96px) clamp(16px,4vw,56px) clamp(48px,7vw,96px) 0', borderTop: '1px solid var(--line)' }}>
+    <section ref={ref} className="section" style={{ background: 'var(--paper)', paddingBlock: 'clamp(48px,7vw,96px)', borderTop: '1px solid var(--line)' }}>
       <Rail no="06" label="MY PAGE" numColor="#c9c6bf" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap' }}>
           <div className="title-block">
             <h2 className="h2">내 기록</h2>
             <div className="accent-bar" />
+            <p className="lede" style={{ color: 'var(--muted)', fontSize: 13 }}>{savedToClaude ? '내 Claude 계정 공간에 저장돼요. 다른 기기에서 이 페이지를 열어도 그대로 보이고, 다른 사람에게는 보이지 않아요.' : '이 브라우저에만 저장돼요.'}</p>
           </div>
           <button onClick={analyze} style={{ fontSize: 13, padding: '12px 20px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{loading ? '분석 중…' : '누적 분석하기'}</button>
         </div>
