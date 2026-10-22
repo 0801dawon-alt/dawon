@@ -59,6 +59,10 @@ export const CAT_COLORS = { 사회: '#a0614f', 법: '#4c5870', 정치: '#7a3b3b'
 export const NEUTRAL = '#8a8780';
 export const catColor = c => CAT_COLORS[c] || NEUTRAL;
 
+// The two places this app is published.
+export const HOMEPAGE_URL = 'https://0801dawon-alt.github.io/dawon/';
+export const CLAUDE_URL = 'https://claude.ai/artifact/Y9WdgjDnkGwq1eqap33XgE';
+
 export const ACCENT = '#5d6b3a';
 export const ACCENT2 = '#5d6b3a';
 export const BURGUNDY = '#7F4C4C';

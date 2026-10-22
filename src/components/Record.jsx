@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from 'react';
-import { ACCENT, LAW_GUIDE, QUESTION_CRAFT } from '../lib/constants.js';
+import { ACCENT, CLAUDE_URL, HOMEPAGE_URL, LAW_GUIDE, QUESTION_CRAFT } from '../lib/constants.js';
 import { ask, inArtifact } from '../lib/ai.js';
 import { countFillers, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
@@ -55,7 +55,7 @@ const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coar
 const MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
 const DICTATION_TIP = TOUCH ? ' 키보드의 🎤 버튼을 누르고 말하면 받아 적혀요.'
   : MAC ? ' fn 키를 두 번 누르고 말하면 받아 적혀요(Mac 받아쓰기).'
-  : ' Windows 키 + H를 누르고 말하면 받아 적혀요(Windows 음성 입력).';
+  : ' Windows 노트북은 아래 ‘🎤 말로 답하기’ 안내를 따라 홈페이지에서 녹음한 뒤 붙여 넣으세요.';
 
 // Step-by-step dictation guide, shown under the '말로 답하기' button.
 const GUIDE = TOUCH ? [
@@ -68,15 +68,18 @@ const GUIDE = TOUCH ? [
   ['지금', 'fn 키를 두 번 누르고 말하세요(🎤 키가 있는 키보드라면 🎤 키). 말한 내용이 답변 칸에 받아 적혀요. 다 말했으면 fn 키를 한 번 더 누르세요.'],
   ['받아쓰기가 안 켜진다면', '시스템 설정 → 키보드 → ‘받아쓰기’를 켜고, 언어에 한국어가 있는지 확인하세요.'],
 ] : [
-  ['지금', 'Windows 키 + H를 누르면 음성 입력 창이 떠요. 말한 내용이 답변 칸에 받아 적혀요.'],
-  ['한국어로 안 받아 적힌다면', '설정 → 시간 및 언어 → 언어 및 지역에서 한국어 음성 팩을 설치하세요.'],
+  ['Windows 노트북이라면', 'Windows 기본 음성 입력은 한국어를 지원하지 않는 경우가 많아요. 크롬에서 아래 홈페이지를 열고 ‘자동 녹음’으로 답한 뒤 ‘복사하고 Claude 피드백 받기’를 누르세요. 이 화면이 열리면 답변 칸에 붙여 넣기(Ctrl+V)만 하면 질문과 답변이 함께 들어가요.'],
+  ['Windows 11이라면', 'Windows 키 + H 음성 입력이 한국어를 지원할 수도 있어요. 입력 언어를 한국어로 바꾼 뒤 시도해 보세요.'],
 ];
+
+// Format the homepage copies for the claude.ai page: [질문] ...\n[답변] ...
+const HANDOFF = /^\s*\[질문\]\s*([^\n]*)\n\[답변\]\s*([\s\S]*)$/;
 
 const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)' };
 
 // 05 답변 녹음·피드백. Recording starts when the timer enters the answer phase and
 // stops (and saves an attempt) when it leaves it.
-export const Record = forwardRef(function Record({ timer, question, entries, attempts, saveAttempts, onFinish, onPractice, flash }, ref) {
+export const Record = forwardRef(function Record({ timer, question, setQuestion, entries, attempts, saveAttempts, onFinish, onPractice, flash }, ref) {
   const [recOn, setRecOn] = useState(!IN_ARTIFACT);
   const [recording, setRecording] = useState(false);
   const [liveText, setLiveText] = useState('');
@@ -218,17 +221,26 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
                       <span className="link" style={{ fontSize: 12.5, color: 'var(--muted)' }} onClick={() => setGuideOpen(false)}>닫기</span>
                     </div>
                     {GUIDE.map(([h, t]) => <div key={h}><span style={{ color: 'var(--muted)' }}>{h} · </span>{t}</div>)}
+                    {!TOUCH && !MAC && <a href={HOMEPAGE_URL} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', fontWeight: 600 }}>녹음되는 홈페이지 열기 ↗</a>}
                   </div>
                 )}
               </div>
             )}
             <div className="label" style={{ color: 'var(--muted)' }}>전사 {question ? '· ' + (question.length > 40 ? question.slice(0, 40) + '…' : question) : ''}</div>
-            <textarea ref={answerRef} className="transcript" rows={9} value={liveText} onChange={ev => setLiveText(ev.target.value)}
+            <textarea ref={answerRef} className="transcript" rows={9} value={liveText} onChange={ev => {
+                // Text copied from the homepage carries the question too: fill both fields.
+                const m = ev.target.value.match(HANDOFF);
+                if (m) { setQuestion(m[1].trim()); setLiveText(m[2].trim()); } else setLiveText(ev.target.value);
+              }}
               placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : (IN_ARTIFACT ? '답변을 말하거나 적은 뒤 ‘피드백 받기’를 누르세요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.') + DICTATION_TIP} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{cur ? `${cur.dur}초 · ${liveText.replace(/\s/g, '').length}자` + (fb && fb.cpm ? ` · 분당 ${fb.cpm}자` : '') : ''}</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {audioUrl && <audio src={audioUrl} controls style={{ height: 34 }} />}
+                {!IN_ARTIFACT && liveText.trim() && (
+                  <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '8px 14px', textDecoration: 'none' }}
+                    onClick={() => { const t = `[질문] ${question || '(질문 없음)'}\n[답변] ${liveText.trim()}`; navigator.clipboard?.writeText(t).then(() => flash('복사했어요. 열린 화면의 답변 칸에 붙여 넣으세요'), () => {}); }}>복사하고 Claude 피드백 받기 ↗</a>
+                )}
                 <button onClick={onFeedback} style={{ fontSize: 13, padding: '8px 14px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{fbLoading ? '평가 중…' : (fb ? '다시 평가' : '피드백 받기')}</button>
               </div>
             </div>

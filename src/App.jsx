@@ -264,7 +264,7 @@ export default function App() {
         setAns={v => setTimer(s => ({ ...s, ans: v, remain: s.phase === 'idle' && !s.prep ? v : s.remain }))}
       />
       <Record
-        ref={refs.r} timer={timer} question={tQuestion} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
+        ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
         onFinish={() => setTimer(s => ({ ...s, phase: 'done', running: false, remain: 0 }))}
         onPractice={practice} flash={flash}
       />
