@@ -92,22 +92,30 @@ export default function App() {
   const attemptsRef = useRef(attempts); attemptsRef.current = attempts;
   const remote = useRef(null);
   const [recordsRemote, setRecordsRemote] = useState(false);
+  // '나의 생각' from the private space (null = not connected, use the entry's local myView).
+  const [notes, setNotes] = useState(null);
+  const notesRef = useRef(notes); notesRef.current = notes;
+  const noteTimers = useRef({});
   useEffect(() => {
     let live = true, conn = null;
     connectRecords({
-      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null) },
+      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])) },
       onAttempts: list => { if (!live) return; attemptsRef.current = list; setAttempts(list); },
       onAnalysis: an => { if (live) setAnalysisState(an); },
+      // Keep text still waiting to be written so a sync never rolls back what is being typed.
+      onNotes: map => { if (live) setNotes(prev => { const next = { ...map }; Object.keys(noteTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
       onFail: () => {
         if (!live || !remote.current) return;
         remote.current = null; setRecordsRemote(false);
         saveJSON(ATTEMPTS_KEY, attemptsRef.current.slice(0, 200));
+        const n = notesRef.current;
+        if (n) save(list => list.map(e => (e.id in n ? { ...e, myView: n[e.id] } : e)));
         flash('Claude 계정에 저장할 수 없어 이 브라우저에 저장합니다');
       },
     }).then(r => { if (!live) { r && r.unsubscribe(); return; } conn = r; if (r) { remote.current = r; setRecordsRemote(true); } })
       .catch(() => {});
     return () => { live = false; conn && conn.unsubscribe(); remote.current = null; };
-  }, [flash]);
+  }, [flash, save]);
   const saveAttempts = useCallback(fn => {
     const prev = attemptsRef.current, next = fn(prev).slice(0, 200);
     attemptsRef.current = next; setAttempts(next);
@@ -160,7 +168,16 @@ export default function App() {
   }, [entries]);
 
   const validId = id => (id && entries.some(e => e.id === id) ? id : entries[0] && entries[0].id) || '';
-  const od = entries.find(e => e.id === openId) || null;
+  const odBase = entries.find(e => e.id === openId) || null;
+  const od = odBase && notes && remote.current ? { ...odBase, myView: notes[odBase.id] ?? odBase.myView ?? '' } : odBase;
+  const onMyView = (id, text) => {
+    const r = remote.current;
+    if (!r) { updateEntry(id, { myView: text }); return; }
+    setNotes(n => ({ ...(n || {}), [id]: text }));
+    // One write per pause in typing.
+    clearTimeout(noteTimers.current[id]);
+    noteTimers.current[id] = setTimeout(() => { delete noteTimers.current[id]; r.putNote(id, text); }, 800);
+  };
 
   async function restructureEntry(id, current) {
     const e = current || entries.find(x => x.id === id); if (!e) return false;
@@ -267,7 +284,7 @@ export default function App() {
           onEdit={() => setForm({ id: od.id, title: od.title, category: od.category, summary: od.summary || '', keywords: (od.keywords || []).join(', '), body: od.body || '' })}
           onDelete={() => { save(prev => prev.filter(e => e.id !== od.id)); setOpenId(null); flash('삭제했습니다'); }}
           onPractice={practice}
-          onMyView={v => updateEntry(od.id, { myView: v })}
+          onMyView={v => onMyView(od.id, v)}
           onToQuestions={() => { setQTopic(od.id); setOpenId(null); scroll('q'); }}
           onToPassage={() => { setPTopic(od.id); setOpenId(null); scroll('p'); }}
         />
