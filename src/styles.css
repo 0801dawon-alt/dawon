@@ -105,7 +105,9 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .lib-tools { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
 .search { font: inherit; font-size: 14px; padding: 12px 0; width: min(280px, 100%); background: transparent; border: none; border-bottom: 1px solid var(--ink); outline: none; color: var(--ink); }
 .add-link { font-size: 13px; padding: 12px 0; cursor: pointer; text-decoration: underline; white-space: nowrap; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+@media (max-width: 1180px) { .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .card-grid { grid-template-columns: minmax(0, 1fr); } }
 .card { background: var(--paper); padding: 28px 26px 26px; display: flex; flex-direction: column; gap: 14px; min-height: 220px; cursor: pointer; transition: background .2s; }
 .card:hover { background: #ecebe7; }
 .card-top { display: flex; justify-content: space-between; align-items: center; height: 60px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }

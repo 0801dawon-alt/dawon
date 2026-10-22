@@ -3,7 +3,8 @@ import { catColor } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
-const PER_PAGE = 6;
+// 8 per page fills every row at 4, 2 or 1 columns (see .card-grid).
+const PER_PAGE = 8;
 // Number backdrops: [border-radius, width, height, rotation]. Kept near-circular so
 // the category label lines up across cards.
 const SHAPES = [['50%', 56, 56, 0], ['28px 28px 0 0', 52, 56, 0], ['6px', 52, 52, 8], ['999px', 52, 58, 0], ['18px', 54, 54, 45], ['50% 0', 54, 54, 0], ['0 0 28px 28px', 56, 50, 0], ['50%', 56, 52, -6], ['16px 4px', 50, 58, 0]];
@@ -54,7 +55,7 @@ const Library = forwardRef(function Library({ entries, categories, cat, setCat, 
         </div>
         <div className="card-grid">
           {filtered.slice(start, start + PER_PAGE).map((e, i0) => (
-            <article key={e.id} className="card" data-reveal="1" data-d={(i0 % 3) * 90} onClick={() => onOpen(e.id)}>
+            <article key={e.id} className="card" data-reveal="1" data-d={(i0 % 4) * 90} onClick={() => onOpen(e.id)}>
               <div className="card-top">
                 <NumberShape entry={e} index={start + i0} />
                 <span className="card-cat"><span style={{ width: 7, height: 7, background: catColor(e.category) }} />{e.category}</span>
