@@ -52,7 +52,10 @@ async function nextFollowup(at, prev) {
 // claude.ai pages cannot use the microphone; phones can still dictate through the keyboard.
 const IN_ARTIFACT = inArtifact();
 const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-const DICTATION_TIP = TOUCH ? ' 휴대폰 키보드의 🎤 음성 입력을 누르고 말하면 받아 적혀요.' : '';
+const MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
+const DICTATION_TIP = TOUCH ? ' 키보드의 🎤 버튼을 누르고 말하면 받아 적혀요.'
+  : MAC ? ' fn 키를 두 번 누르고 말하면 받아 적혀요(Mac 받아쓰기).'
+  : ' Windows 키 + H를 누르고 말하면 받아 적혀요(Windows 음성 입력).';
 
 const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)' };
 
@@ -158,7 +161,7 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
   const setMode = v => { if (!v && recording) stopRec(false); setRecOn(v); };
   const recStatus = recording
     ? '녹음·전사 중… 답변이 끝나면 ‘답변 종료’를 누르거나 시간이 다 되길 기다리세요'
-    : (recErr || (recOn ? '타이머의 답변 시간이 시작되면 자동으로 녹음됩니다' : (IN_ARTIFACT ? 'claude.ai 화면에서는 녹음 대신 답변을 적어 피드백을 받아요.' + DICTATION_TIP : '직접 작성 모드 · 녹음 없이 타이머를 보며 답변을 적어보세요')));
+    : (recErr || (recOn ? '타이머의 답변 시간이 시작되면 자동으로 녹음됩니다' : (IN_ARTIFACT ? '말로 답하려면 답변 칸을 누른 뒤' + DICTATION_TIP : '직접 작성 모드 · 녹음 없이 타이머를 보며 답변을 적어보세요')));
 
   return (
     <section ref={ref} className="section" style={{ background: 'var(--cream)', paddingBlock: 'clamp(48px,7vw,96px)', borderTop: '1px solid var(--line)' }}>
@@ -168,11 +171,12 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
           <div className="title-block" style={{ flex: 1, minWidth: 220 }}>
             <h2 className="h2">답변 녹음 · 피드백</h2>
             <div className="accent-bar" />
-            <p className="lede" style={{ color: 'var(--body)', maxWidth: 520 }}>자동 녹음으로 말하거나 직접 적어서 답변하면 AI가 평가하고, <br />꼬리질문까지 이어 받을 수 있습니다. 모든 답변은 아래 ‘내 기록’에 쌓입니다.</p>
+            <p className="lede" style={{ color: 'var(--body)', maxWidth: 520 }}>{IN_ARTIFACT ? '말하거나 적어서 답변하면 Claude가 평가하고, ' : '자동 녹음으로 말하거나 직접 적어서 답변하면 AI가 평가하고, '}<br />꼬리질문까지 이어 받을 수 있습니다. 모든 답변은 아래 ‘내 기록’에 쌓입니다.</p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span className="label" style={{ color: 'var(--muted)', marginRight: 4 }}>답변 방식</span>
-            {[[true, '● 자동 녹음'], [false, '✎ 직접 작성']].map(([v, l]) => (
+            {/* claude.ai pages cannot record, so only the homepage offers the mode switch. */}
+            {!IN_ARTIFACT && <span className="label" style={{ color: 'var(--muted)', marginRight: 4 }}>답변 방식</span>}
+            {!IN_ARTIFACT && [[true, '● 자동 녹음'], [false, '✎ 직접 작성']].map(([v, l]) => (
               <button key={l} className={'box' + (v === recOn ? ' on' : '')} style={{ flex: 'none', width: 100, maxWidth: 'none', fontSize: 12.5 }} onClick={() => setMode(v)}>{l}</button>
             ))}
             {recording && <button onClick={onFinish} style={{ fontSize: 13, padding: '8px 14px', border: '1px solid var(--danger)', background: 'var(--danger)', color: '#fff' }}>답변 종료</button>}
@@ -185,7 +189,7 @@ export const Record = forwardRef(function Record({ timer, question, entries, att
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="label" style={{ color: 'var(--muted)' }}>전사 {question ? '· ' + (question.length > 40 ? question.slice(0, 40) + '…' : question) : ''}</div>
             <textarea className="transcript" rows={9} value={liveText} onChange={ev => setLiveText(ev.target.value)}
-              placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.' + DICTATION_TIP} />
+              placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : (IN_ARTIFACT ? '답변을 말하거나 적은 뒤 ‘피드백 받기’를 누르세요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.') + DICTATION_TIP} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{cur ? `${cur.dur}초 · ${liveText.replace(/\s/g, '').length}자` + (fb && fb.cpm ? ` · 분당 ${fb.cpm}자` : '') : ''}</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
