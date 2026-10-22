@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { NEUTRAL, tagLinks } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import CASES from '../data/cases.js';
+import TAGFIX from '../data/tagfix.js';
 
 const sectionLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted)' };
 
@@ -15,7 +16,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
   // Case links only where real rulings exist: 대법원 (S) and/or 헌법재판소 (C).
   const courts = CASES[od.id] || '';
   const keepCase = c => (c.label === '대법원 판례' ? courts.includes('S') : c.label === '헌법재판소 결정' ? courts.includes('C') : !!courts);
-  const tags = (od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
+  const tags = (TAGFIX[od.id] || od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
   return (
     <div className="overlay" style={{ zIndex: 50, justifyContent: 'flex-end' }}>
       <div className="overlay-dim" onClick={onClose} />
