@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { ACCENT, CLAUDE_URL, HOMEPAGE_URL, LAW_GUIDE, QUESTION_CRAFT } from '../lib/constants.js';
-import { ask, inArtifact, lastAiIssue, markUnreadable } from '../lib/ai.js';
+import { ask, hasApiKey, inArtifact, lastAiIssue, markUnreadable } from '../lib/ai.js';
+import { SYNC_RE, decodeSync, encodeSyncPlain } from '../lib/sync.js';
 import { countFillers, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
@@ -140,15 +141,16 @@ const GUIDE = TOUCH ? [
 // Format the homepage copies for the claude.ai page: [질문] ...\n[답변] ...\n[내 질문 목록]\n- ...
 // The question list carries questions typed on the homepage back to the claude.ai page.
 const HANDOFF = /^\s*\[질문\]\s*([^\n]*)\n\[답변\]\s*([\s\S]*?)(?:\n\[내 질문 목록\]\n([\s\S]*))?$/;
-const QLIST = '\n[내 질문 목록]\n';
-// The homepage link carries the question list and the current question in its hash.
-const carryLink = (myQuestions, q) => HOMEPAGE_URL + '#carry=' + encodeURIComponent(JSON.stringify({ mq: myQuestions.map(x => x.q), q: q || '' }));
+// The homepage link carries all records (answers, my questions) and the current question in its hash.
+const carryLink = (token, myQuestions, q) => HOMEPAGE_URL + '#carry=' + (token || encodeURIComponent(JSON.stringify({ mq: myQuestions.map(x => x.q) }))) + (q ? '&q=' + encodeURIComponent(q) : '');
+// Copied from the homepage: the answer to review plus every homepage record, for the claude.ai page.
+export const copyRecordsText = (attempts, myQuestions, cur) => '[기록] ' + encodeSyncPlain({ attempts: attempts.slice(0, 200), mq: myQuestions.map(x => x.q), cur: cur || '' });
 
 const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)' };
 
 // 05 답변 녹음·피드백. Recording starts when the timer enters the answer phase and
 // stops (and saves an attempt) when it leaves it.
-export const Record = forwardRef(function Record({ timer, question, setQuestion, context, entries, attempts, saveAttempts, onFinish, onPractice, flash, myQuestions = [], onCarryQuestions }, ref) {
+export const Record = forwardRef(function Record({ timer, question, setQuestion, context, entries, attempts, saveAttempts, onFinish, onPractice, flash, myQuestions = [], onCarryQuestions, syncToken, onImport }, ref) {
   const [rubricOpen, setRubricOpen] = useState(false);
   const [recOn, setRecOn] = useState(!IN_ARTIFACT);
   const [recording, setRecording] = useState(false);
@@ -218,7 +220,8 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
       const text = (t || '').trim();
       const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: q || '(질문 없음)', text, dur, limit, context: c || '', fb: null };
       saveAttempts(list => [at, ...list]); setCurAtt(at.id);
-      if (text) runFeedback(at, text);
+      // Without AI on the homepage the answer is kept for feedback on the claude.ai page instead.
+      if (text && (IN_ARTIFACT || hasApiKey())) runFeedback(at, text);
     }, 700);
   };
 
@@ -239,6 +242,34 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: question || '(질문 없음)', text: liveText, dur: used, limit: timer.ans, context: context || '', fb: null, manual: !recOn };
     saveAttempts(list => [at, ...list]); setCurAtt(at.id); setFuList([]);
     runFeedback(at, liveText);
+  };
+
+  // Homepage: save the answer as a record if needed, then copy it with every homepage record.
+  const copyForClaude = () => {
+    let id = cur && cur.text === liveText ? cur.id : '';
+    const extra = [];
+    if (!id) {
+      const used = timer.phase === 'answer' || timer.phase === 'done' ? Math.max(0, timer.ans - timer.remain) + (timer.over || 0) : (cur ? cur.dur : 0);
+      const at = cur ? { ...cur, text: liveText } : { id: 'a' + Date.now(), date: new Date().toISOString(), q: question || '(질문 없음)', text: liveText, dur: used, limit: timer.ans, context: context || '', fb: null, manual: !recOn };
+      id = at.id; extra.push(at);
+      saveAttempts(list => (cur ? list.map(a => (a.id === at.id ? at : a)) : [at, ...list])); setCurAtt(at.id);
+    }
+    const list = [...extra, ...attempts.filter(a => !extra.some(x => x.id === a.id))];
+    navigator.clipboard?.writeText(copyRecordsText(list, myQuestions, id)).then(() => flash('복사했어요. 열린 Claude 화면의 답변 칸에 붙여 넣으세요'), () => flash('복사하지 못했어요. 다시 눌러 주세요'));
+  };
+
+  // claude.ai page: records pasted from the homepage join the lists, and the answer just given is reviewed.
+  const pasteRecords = async v => {
+    const payload = await decodeSync(v);
+    if (!payload || !onImport) { flash('붙여 넣은 기록을 읽지 못했어요. 홈페이지에서 다시 복사해 주세요'); return; }
+    const r = onImport(payload) || {};
+    const at = (payload.attempts || []).find(a => a.id === payload.cur);
+    const parts = [r.added ? `답변 ${r.added}개` : '', r.questions ? `질문 ${r.questions}개` : ''].filter(Boolean);
+    flash(parts.length ? `홈페이지 기록을 옮겼어요 · ${parts.join(', ')}` : '홈페이지 기록이 이미 모두 옮겨져 있어요');
+    if (!at) return;
+    setQuestion(at.q === '(질문 없음)' ? '' : at.q); setLiveText(at.text || ''); setCurAtt(at.id); setFuList([]);
+    const known = live.current.attempts.find(a => a.id === at.id);
+    if (!at.fb && !(known && known.fb) && (at.text || '').trim()) runFeedback(at, at.text);
   };
 
   const getFollowup = async () => {
@@ -293,7 +324,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                       <span className="link" style={{ fontSize: 12.5, color: 'var(--muted)' }} onClick={() => setGuideOpen(false)}>닫기</span>
                     </div>
                     {GUIDE.map(([h, t]) => <div key={h}><span style={{ color: 'var(--muted)' }}>{h} · </span>{t}</div>)}
-                    {!TOUCH && !MAC && <a href={carryLink(myQuestions, question)} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', fontWeight: 600 }}>녹음되는 홈페이지 열기 ↗</a>}
+                    {!TOUCH && !MAC && <a href={carryLink(syncToken, myQuestions, question)} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', fontWeight: 600 }}>녹음되는 홈페이지 열기 ↗</a>}
                   </div>
                 )}
               </div>
@@ -301,11 +332,13 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
             <div className="label" style={{ color: 'var(--muted)' }}>전사 {question ? '· ' + (question.length > 40 ? question.slice(0, 40) + '…' : question) : ''}</div>
             <textarea ref={answerRef} className="transcript" rows={9} value={liveText} onChange={ev => {
                 // Text copied from the homepage carries the question too: fill both fields.
-                const m = ev.target.value.match(HANDOFF);
+                const v = ev.target.value;
+                if (SYNC_RE.test(v)) { pasteRecords(v); return; }
+                const m = v.match(HANDOFF);
                 if (m) {
                   setQuestion(m[1].trim()); setLiveText(m[2].trim());
                   if (m[3] && onCarryQuestions) onCarryQuestions(m[3].split('\n').map(l => l.replace(/^-\s*/, '')));
-                } else setLiveText(ev.target.value);
+                } else setLiveText(v);
               }}
               placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : (IN_ARTIFACT ? '답변을 말하거나 적은 뒤 ‘피드백 받기’를 누르세요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.') + DICTATION_TIP} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -314,13 +347,18 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                 {audioUrl && <audio src={audioUrl} controls style={{ height: 34 }} />}
                 {!IN_ARTIFACT && liveText.trim() && (
                   <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '8px 14px', textDecoration: 'none' }}
-                    onClick={() => { const t = `[질문] ${question || '(질문 없음)'}\n[답변] ${liveText.trim()}` + (myQuestions.length ? QLIST + myQuestions.map(x => '- ' + x.q.replace(/\s*\n\s*/g, ' ')).join('\n') : ''); navigator.clipboard?.writeText(t).then(() => flash('복사했어요. 열린 화면의 답변 칸에 붙여 넣으세요'), () => {}); }}>복사하고 Claude 피드백 받기 ↗</a>
+                    onClick={copyForClaude}>복사하고 Claude 피드백 받기 ↗</a>
                 )}
-                <button onClick={onFeedback} style={{ fontSize: 13, padding: '8px 14px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{fbLoading ? '평가 중…' : (fb ? '다시 평가' : '피드백 받기')}</button>
+                {(IN_ARTIFACT || hasApiKey()) && <button onClick={onFeedback} style={{ fontSize: 13, padding: '8px 14px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{fbLoading ? '평가 중…' : (fb ? '다시 평가' : '피드백 받기')}</button>}
               </div>
             </div>
           </div>
           <div className="fb-panel">
+            {!fb && !IN_ARTIFACT && !hasApiKey() && (
+              <div style={{ fontSize: 14, lineHeight: 1.75, color: '#e9e6dd', borderBottom: '1px solid var(--charcoal-line)', paddingBottom: 14 }}>
+                이 홈페이지는 AI가 연결되어 있지 않아 피드백은 Claude에서 받아요. 답변과 전사가 끝나면 왼쪽의 ‘복사하고 Claude 피드백 받기’를 누르고, 열린 Claude 화면의 답변 칸에 붙여 넣으세요. 피드백이 바로 나오고, 여기서 한 답변 기록도 모두 Claude로 옮겨져요.
+              </div>
+            )}
             {!fb && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--muted-3)' }}>답변이 끝나면 로스쿨 구술면접 평가 기준표(6개 항목 · 100점)로 채점하고, 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 보여 줍니다.</div>
@@ -433,8 +471,28 @@ function tagCount(attempts, key) {
 }
 
 // 06 내 기록: running stats, repeated tags, AI trend analysis and the attempt log.
-export const MyPage = forwardRef(function MyPage({ attempts, saveAttempts, analysis, setAnalysis, savedToClaude, bookCount, onOpenBook, onPractice, flash }, ref) {
+export const MyPage = forwardRef(function MyPage({ attempts, saveAttempts, analysis, setAnalysis, savedToClaude, bookCount, onOpenBook, onPractice, flash, myQuestions = [], onImport }, ref) {
   const [openId, setOpenId] = useState(null);
+  const [grading, setGrading] = useState('');
+  // Answers carried over from the homepage arrive without feedback; grade them here.
+  const grade = async a => {
+    if (grading) return;
+    setGrading(a.id);
+    const fb = await evaluate(a, a.text || '', null);
+    saveAttempts(list => list.map(x => (x.id === a.id ? { ...x, fb } : x)));
+    setGrading('');
+  };
+  const importText = async v => {
+    if (!SYNC_RE.test(v)) return;
+    const payload = await decodeSync(v);
+    const r = payload && onImport ? onImport(payload) : null;
+    if (!r) { flash('붙여 넣은 기록을 읽지 못했어요. 홈페이지에서 다시 복사해 주세요'); return; }
+    const parts = [r.added ? `답변 ${r.added}개` : '', r.updated ? `피드백 ${r.updated}개` : '', r.questions ? `질문 ${r.questions}개` : ''].filter(Boolean);
+    flash(parts.length ? `홈페이지 기록을 옮겼어요 · ${parts.join(', ')}` : '홈페이지 기록이 이미 모두 옮겨져 있어요');
+  };
+  const sendToClaude = () => {
+    navigator.clipboard?.writeText(copyRecordsText(attempts, myQuestions, '')).then(() => flash('복사했어요. 열린 Claude 화면의 ‘내 기록’ 가져오기 칸에 붙여 넣으세요'), () => flash('복사하지 못했어요. 다시 눌러 주세요'));
+  };
   const [loading, setLoading] = useState(false);
   const F = attempts.filter(a => a.fb);
   const allFl = {}; F.forEach(a => Object.entries(a.fb.fillers || {}).forEach(([k, n]) => { allFl[k] = (allFl[k] || 0) + n; }));
@@ -481,10 +539,17 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
           <div className="title-block">
             <h2 className="h2">내 기록</h2>
             <div className="accent-bar" />
-            <p className="lede" style={{ color: 'var(--muted)', fontSize: 13 }}>{savedToClaude ? '내 Claude 계정 공간에 저장돼요. 다른 기기에서 이 페이지를 열어도 그대로 보이고, 다른 사람에게는 보이지 않아요.' : '이 브라우저에만 저장돼요.'}</p>
+            <p className="lede" style={{ color: 'var(--muted)', fontSize: 13 }}>{savedToClaude ? '내 Claude 계정 공간에 저장돼요. 다른 기기에서 이 페이지를 열어도 그대로 보이고, 다른 사람에게는 보이지 않아요.' : IN_ARTIFACT ? '이 브라우저에만 저장돼요.' : '이 홈페이지 기록은 이 브라우저에만 있어요. ‘기록을 Claude로 옮기기’로 Claude에 합쳐 두면 어디서 열어도 같은 기록이 보여요.'}</p>
           </div>
+          {!IN_ARTIFACT && <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '12px 18px', textDecoration: 'none' }} onClick={sendToClaude}>기록을 Claude로 옮기기 ↗</a>}
           <button onClick={analyze} style={{ fontSize: 13, padding: '12px 20px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{loading ? '분석 중…' : '누적 분석하기'}</button>
         </div>
+        {IN_ARTIFACT && (
+          <div className="import-box">
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>홈페이지 기록 가져오기 · 홈페이지 ‘내 기록’의 ‘기록을 Claude로 옮기기’를 누른 뒤 여기에 붙여 넣으세요. 홈페이지를 링크의 ‘녹음되는 홈페이지 열기’로 열면 여기 기록도 홈페이지에 함께 보여요.</span>
+            <input className="manual-input" value="" onChange={ev => importText(ev.target.value)} onPaste={ev => { ev.preventDefault(); importText(ev.clipboardData.getData('text')); }} placeholder="여기에 붙여 넣기 (Ctrl+V)" />
+          </div>
+        )}
         <button className="qbook-open" onClick={onOpenBook}>
           <span style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left' }}>
             <span style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 18 }}>질문 모음</span>
@@ -531,7 +596,7 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
               <div className="attempt-row" onClick={() => setOpenId(openId === a.id ? null : a.id)}>
                 <span className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{fmt(a.date)}</span>
                 <span style={{ fontSize: 14.5, lineHeight: 1.6, wordBreak: 'keep-all' }}>{a.q}</span>
-                <span style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: 20, textAlign: 'right' }}>{a.fb ? String(a.fb.total) : '—'}</span>
+                <span style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: a.fb ? 20 : 12.5, textAlign: 'right', color: a.fb ? undefined : 'var(--muted)' }}>{a.fb ? String(a.fb.total) : '피드백 전'}</span>
               </div>
               {openId === a.id && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 0 22px' }}>
@@ -547,7 +612,12 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
                       </RecordBlock>
                       {a.fb.model && <RecordBlock title="모범답안" boxed serif>{a.fb.model}</RecordBlock>}
                     </>
-                  ) : <div style={{ fontSize: 13.5, color: 'var(--muted)' }}>피드백 전</div>}
+                  ) : (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5, color: 'var(--muted)' }}>
+                      피드백 전
+                      {(IN_ARTIFACT || hasApiKey()) && (a.text || '').trim() && <button className="btn-line" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => grade(a)}>{grading === a.id ? '평가 중…' : '피드백 받기'}</button>}
+                    </div>
+                  )}
                   {(a.followups || []).length > 0 && (
                     <RecordBlock title="꼬리질문">{a.followups.map((q, i) => <div key={i}>{i + 1}. {q}</div>)}</RecordBlock>
                   )}

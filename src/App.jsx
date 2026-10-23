@@ -4,6 +4,7 @@ import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
 import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
+import { decodeSync, encodeSync, mergeAttemptLists } from './lib/sync.js';
 import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
 import Hero from './components/Hero.jsx';
 import Library from './components/Library.jsx';
@@ -163,16 +164,37 @@ export default function App() {
     saveMyQuestions([...add.map((q, i) => ({ id: uid(), q, date: new Date(now - i).toISOString() })), ...myQRef.current]);
     return add.length;
   };
-  // The claude.ai page opens the homepage with #carry=… holding the question list and current question.
+  // Records from the other side (answers and my questions) join this side's lists once.
+  const importSync = payload => {
+    if (!payload) return null;
+    const list = (payload.attempts || []).filter(a => a && a.id);
+    const before = new Map(attemptsRef.current.map(a => [a.id, a]));
+    const added = list.filter(a => !before.has(a.id)).length;
+    const updated = list.filter(a => before.has(a.id) && a.fb && !before.get(a.id).fb).length;
+    if (list.length) saveAttempts(prev => mergeAttemptLists(prev, list));
+    return { added, updated, questions: mergeMyQuestions(payload.mq || []) };
+  };
+  // This side's records as one token, for the homepage link and the copy-back text.
+  const [syncToken, setSyncToken] = useState('');
   useEffect(() => {
-    const m = location.hash.match(/^#carry=(.+)$/);
+    let on = true;
+    const attemptsOut = attempts.slice(0, 80).map(a => (a.context && a.context.length > 1500 ? { ...a, context: a.context.slice(0, 1500) } : a));
+    encodeSync({ attempts: attemptsOut, mq: myQuestions.map(x => x.q) }).then(t => { if (on) setSyncToken(t); }, () => {});
+    return () => { on = false; };
+  }, [attempts, myQuestions]);
+  // The claude.ai page opens the homepage with #carry=<records>&q=<current question>.
+  useEffect(() => {
+    const m = location.hash.match(/^#carry=([^&]+)(?:&q=(.*))?$/);
     if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (m[2]) setTQuestion(decodeURIComponent(m[2]));
+    if (m[1].startsWith('TL')) { decodeSync(m[1]).then(importSync); return; }
     try {
+      // Links made before records were carried held only the question list.
       const c = JSON.parse(decodeURIComponent(m[1]));
       mergeMyQuestions(c.mq || []);
       if (c.q) setTQuestion(c.q);
     } catch { /* malformed link */ }
-    history.replaceState(null, '', location.pathname + location.search);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
@@ -325,10 +347,11 @@ export default function App() {
       <Record
         ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} context={tContext} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
         onFinish={() => setTimer(finishTimer)}
-        onPractice={practice} flash={flash} myQuestions={myQuestions}
+        onPractice={practice} flash={flash} myQuestions={myQuestions} syncToken={syncToken}
         onCarryQuestions={qs => { const n = mergeMyQuestions(qs); if (n) flash(`홈페이지에서 입력한 질문 ${n}개를 질문 목록에 보관했어요`); }}
+        onImport={importSync}
       />
-      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onOpenBook={() => setBookOpen(true)}
+      <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onOpenBook={() => setBookOpen(true)} myQuestions={myQuestions} onImport={importSync}
         bookCount={new Set([...myQuestions.map(x => x.q.trim()), ...attempts.filter(a => a.q && a.q !== '(질문 없음)').map(a => a.q.trim())]).size} onPractice={practice} flash={flash} />
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
       <MiniTimer timer={timer} timerRef={refs.t} onClick={() => scroll('t')} />
