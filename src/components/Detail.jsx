@@ -32,7 +32,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
             <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 22, lineHeight: 1 }}>×</span>
           </div>
         </div>
-        <div style={{ padding: 'clamp(28px,5vw,56px) clamp(20px,4vw,48px)', display: 'flex', flexDirection: 'column', gap: 40 }}>
+        <div className="detail-body" style={{ padding: 'clamp(28px,5vw,56px) clamp(20px,4vw,56px)', display: 'flex', flexDirection: 'column', gap: 40 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <h2 style={{ margin: 0, fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(26px,3.4vw,36px)', lineHeight: 1.3, letterSpacing: '-0.03em', textWrap: 'pretty' }}>{od.title}</h2>
             <div className="accent-bar" />

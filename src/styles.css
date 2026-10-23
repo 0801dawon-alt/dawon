@@ -34,6 +34,8 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 @keyframes tlPop { from { opacity: 0; transform: translateY(24px) scale(.5); } to { opacity: 1; transform: none; } }
 @keyframes tlOut { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(50% 0 50% 0); } }
 @keyframes tlLine { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes tlSlideIn { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+@keyframes tlFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .page { min-height: 100vh; background: var(--cream); }
 
@@ -187,8 +189,8 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 
 /* ── overlays ── */
 .overlay { position: fixed; inset: 0; display: flex; }
-.overlay-dim { position: absolute; inset: 0; background: rgba(20, 20, 20, 0.45); }
-.detail { position: relative; width: min(680px, 100%); height: 100%; overflow-y: auto; background: var(--paper); display: flex; flex-direction: column; }
+.overlay-dim { position: absolute; inset: 0; background: rgba(20, 20, 20, 0.45); animation: tlFadeIn .3s ease both; }
+.detail { position: relative; width: calc(100% - clamp(56px, 9vw, 120px)); animation: tlSlideIn .42s cubic-bezier(.2, .8, .2, 1) both; box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.35); height: 100%; overflow-y: auto; background: var(--paper); display: flex; flex-direction: column; }
 .detail-bar { position: sticky; top: 0; background: var(--paper); display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px clamp(20px, 4vw, 48px); border-bottom: 1px solid var(--line); z-index: 1; }
 .pill { font-size: 12px; padding: 5px 12px; border: 1px solid var(--muted-4); border-radius: 999px; }
 .pill-link { font-size: 12.5px; padding: 5px 11px; border: 1px solid var(--muted-4); border-radius: 999px; text-decoration: none; color: var(--ink); white-space: nowrap; }
@@ -248,3 +250,7 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .qbook-q { font-family: var(--serif); font-size: 16px; line-height: 1.65; word-break: keep-all; }
 .qbook-summary { font-size: 13.5px; line-height: 1.7; color: #2e2d2b; background: #f6f4ee; padding: 12px 14px; }
 .qbook-summary-label { display: block; font-size: 10.5px; letter-spacing: 0.16em; color: var(--muted); margin-bottom: 4px; }
+
+.detail-body { width: 100%; max-width: 1040px; }
+@media (max-width: 900px) { .detail { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .detail, .overlay-dim { animation: none; } }
