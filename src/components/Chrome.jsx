@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ACCENT, BURGUNDY } from '../lib/constants.js';
 
 // Logo 5a: line square (knowledge) overlapping a burgundy circle (thought); the overlap is olive.
@@ -65,11 +66,23 @@ export function Toast({ text }) {
   return text ? <div className="toast">{text}</div> : null;
 }
 
+// Chrome and Android offer to install the homepage as an app (desktop shortcut / home-screen icon).
+let installEvent = null;
+if (typeof window !== 'undefined') window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; window.dispatchEvent(new Event('tl-installable')); });
+
 export function Footer({ onSettings, aiOn }) {
+  const [canInstall, setCanInstall] = useState(!!installEvent);
+  useEffect(() => {
+    const on = () => setCanInstall(!!installEvent);
+    window.addEventListener('tl-installable', on); window.addEventListener('appinstalled', on);
+    return () => { window.removeEventListener('tl-installable', on); window.removeEventListener('appinstalled', on); };
+  }, []);
+  const install = async () => { if (!installEvent) return; installEvent.prompt(); await installEvent.userChoice; installEvent = null; setCanInstall(false); };
   return (
     <footer className="site-footer">
       <span>© Thought Library</span>
       <span>
+        {canInstall && <><span className="link" onClick={install}>앱으로 설치 (바탕화면·홈 화면)</span> · </>}
         항목은 이 브라우저에 저장됩니다 · <span className="link" onClick={onSettings}>{aiOn ? 'AI 연결됨' : 'AI 설정'}</span>
       </span>
     </footer>
