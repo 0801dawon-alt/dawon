@@ -75,8 +75,13 @@ function PanelChips({ label, options, value, onChange, min = 0 }) {
 const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom, onStart, onSkip, onReset, setPrep, setAns }, ref) {
   const { phase, remain, running, prep, ans } = timer;
   // The ring fills exactly one turn over the set prep or answer time, drawn every frame from the clock.
-  const wrapRef = useRef(null), live = useRef(timer);
+  const wrapRef = useRef(null), live = useRef(timer), qRef = useRef(null);
   live.current = timer;
+  // The question box is one line tall and grows with the text, so it always sits on the underline.
+  useEffect(() => {
+    const el = qRef.current; if (!el) return;
+    el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
+  }, [question]);
   useEffect(() => {
     let raf = 0;
     const draw = () => {
@@ -108,7 +113,7 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span className="label" style={{ color: 'var(--muted)' }}>연습할 질문</span>
-          <textarea className="timer-q" rows={2} value={question} onChange={ev => setQuestion(ev.target.value)} placeholder="질문을 입력하거나, 위에서 ‘연습 →’을 누르세요." />
+          <textarea ref={qRef} className="timer-q" rows={1} value={question} onChange={ev => setQuestion(ev.target.value)} placeholder="질문을 입력하거나, 위에서 ‘연습 →’을 누르세요." />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(28px,5vw,64px)', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
