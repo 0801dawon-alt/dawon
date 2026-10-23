@@ -3,6 +3,71 @@ import { NEUTRAL, tagLinks } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import CASES from '../data/cases.js';
 import TAGFIX from '../data/tagfix.js';
+import PROCON from '../data/procon.js';
+import { ask, lastAiIssue } from '../lib/ai.js';
+import { LAW_GUIDE } from '../lib/constants.js';
+import { ctx } from '../lib/util.js';
+
+// Two minutes of speech is about 600 characters (spaces excluded).
+const MODEL_CHARS = 600;
+async function writeModelAnswer(entry, q) {
+  const text = await ask(`너는 한국 로스쿨 구술면접을 준비하는 지원자의 코치다.\n${LAW_GUIDE}\n아래 질문에 대한 모범답안을 실제로 말하는 문장으로 써라.
+- 분량: 말할 때 약 2분, 공백 제외 약 ${MODEL_CHARS}자.
+- 구조: 결론(입장) → 근거 2~3개 → 반대 입장을 짚고 재반박 → 마무리(대안 또는 정리).
+- 법률 지식(조문·판례·법리)에 기대지 말고, 상식 수준의 사례와 논리로 설득할 것. 지어낸 통계나 수치는 쓰지 말 것.
+- 제목이나 머리말 없이 답안 본문만 출력.
+[질문] ${q}
+[주제 자료]
+${ctx(entry)}`);
+  return text ? text.trim() : null;
+}
+
+function useModelAnswer({ entry, q, onSave }) {
+  const saved = (entry.models || {})[q] || '';
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const toggle = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (saved || loading) return;
+    setLoading(true); setErr('');
+    const t = await writeModelAnswer(entry, q);
+    setLoading(false);
+    if (t) onSave(q, t); else setErr(lastAiIssue() || '모범답안을 만들지 못했어요. 다시 눌러 주세요.');
+  };
+  return { toggle, open, panel: open && (
+    <div style={{ background: '#efede6', padding: '14px 16px', fontFamily: 'var(--serif)', fontSize: 14.5, lineHeight: 1.9, whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+      <div style={{ fontFamily: 'var(--sans)', fontSize: 11, letterSpacing: '0.16em', color: 'var(--muted)', marginBottom: 6 }}>모범답안 · 약 2분 분량</div>
+      {loading ? '모범답안을 쓰는 중…' : (saved || err)}
+    </div>
+  ) };
+}
+
+function QuestionRow({ entry, q, onPractice, onSaveModel }) {
+  const m = useModelAnswer({ entry, q, onSave: onSaveModel });
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--line-soft)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start' }}>
+        <span style={{ fontFamily: 'var(--serif)', fontSize: 15, lineHeight: 1.7 }}>{q}</span>
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, paddingTop: 4, flexShrink: 0 }}>
+          <span className="link" onClick={() => onPractice(q)} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>연습 →</span>
+          <span className="link" onClick={m.toggle} style={{ fontSize: 12, whiteSpace: 'nowrap', color: 'var(--muted)' }}>{m.open ? '모범답안 접기' : '→ 모범답안'}</span>
+        </span>
+      </div>
+      {m.panel}
+    </div>
+  );
+}
+
+// One reason per row; wrapped lines start under the text, not under the check mark.
+function Reasons({ items, dark }) {
+  return items.map((x, i) => (
+    <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr)', fontSize: 14, lineHeight: 1.7 }}>
+      <span style={{ color: dark ? '#c9c6bf' : 'var(--accent)' }}>✓</span><span style={{ wordBreak: 'keep-all' }}>{x}</span>
+    </div>
+  ));
+}
 
 const sectionLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted)' };
 
@@ -12,8 +77,10 @@ export function ConfirmLink({ label, armedLabel, onConfirm, style }) {
   return <span className="link" style={style} onClick={() => (armed ? onConfirm() : setArmed(true))} onMouseLeave={() => setArmed(false)}>{armed ? armedLabel : label}</span>;
 }
 
-export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onMyView, onToQuestions, onToPassage }) {
+export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onSaveModel, onMyView, onToQuestions, onToPassage }) {
   // Case links only where real rulings exist: 대법원 (S) and/or 헌법재판소 (C).
+  const fix = PROCON[od.id];
+  const pc = { motion: fix ? fix.motion : '', pro: fix ? fix.pro : (od.pro || []), con: fix ? fix.con : (od.con || []) };
   const courts = CASES[od.id] || '';
   const keepCase = c => (c.label === '대법원 판례' ? courts.includes('S') : c.label === '헌법재판소 결정' ? courts.includes('C') : !!courts);
   const tags = (TAGFIX[od.id] || od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
@@ -58,27 +125,30 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
               ))}
             </div>
           )}
-          {((od.pro || []).length > 0 || (od.con || []).length > 0) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,240px),1fr))', gap: 1, background: 'var(--ink)', border: '1px solid var(--ink)' }}>
-              <div style={{ background: 'var(--paper)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>찬성 · 긍정</div>
-                {(od.pro || []).map((x, i) => <div key={i} style={{ fontSize: 14, lineHeight: 1.7 }}>— {x}</div>)}
-              </div>
-              <div style={{ background: 'var(--charcoal)', color: 'var(--cream)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>반대 · 우려</div>
-                {(od.con || []).map((x, i) => <div key={i} style={{ fontSize: 14, lineHeight: 1.7 }}>— {x}</div>)}
+          {(pc.pro.length > 0 || pc.con.length > 0) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pc.motion && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={sectionLabel}>논제</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 17, lineHeight: 1.6, wordBreak: 'keep-all' }}>{pc.motion}</div>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,240px),1fr))', gap: 1, background: 'var(--ink)', border: '1px solid var(--ink)' }}>
+                <div style={{ background: 'var(--paper)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>{pc.motion ? '찬성 · 논제에 찬성하는 근거' : '찬성 · 긍정'}</div>
+                  <Reasons items={pc.pro} />
+                </div>
+                <div style={{ background: 'var(--charcoal)', color: 'var(--cream)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>{pc.motion ? '반대 · 논제에 반대하는 근거' : '반대 · 우려'}</div>
+                  <Reasons items={pc.con} dark />
+                </div>
               </div>
             </div>
           )}
           {(od.questions || []).length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ ...sectionLabel, marginBottom: 6 }}>예상 질문</div>
-              {od.questions.map((q, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start', padding: '12px 0', borderBottom: '1px solid var(--line-soft)' }}>
-                  <span style={{ fontFamily: 'var(--serif)', fontSize: 15, lineHeight: 1.7 }}>{q}</span>
-                  <span className="link" onClick={() => onPractice(q)} style={{ fontSize: 12, whiteSpace: 'nowrap', paddingTop: 4 }}>연습 →</span>
-                </div>
-              ))}
+              {od.questions.map((q, i) => <QuestionRow key={od.id + i} entry={od} q={q} onPractice={onPractice} onSaveModel={onSaveModel} />)}
             </div>
           )}
           {tags.length > 0 && (

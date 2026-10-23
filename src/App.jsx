@@ -313,6 +313,7 @@ export default function App() {
           onDelete={() => { save(prev => prev.filter(e => e.id !== od.id)); setOpenId(null); flash('삭제했습니다'); }}
           onPractice={practice}
           onMyView={v => onMyView(od.id, v)}
+          onSaveModel={(q, t) => updateEntry(od.id, { models: { ...(odBase.models || {}), [q]: t } })}
           onToQuestions={() => { setQTopic(od.id); setOpenId(null); scroll('q'); }}
           onToPassage={() => { setPTopic(od.id); setOpenId(null); scroll('p'); }}
         />
