@@ -42,7 +42,7 @@ export function MiniTimer({ timer, timerRef, onClick }) {
   );
 }
 
-// Preset chips plus '직접', which opens minute/second fields for any length up to 99 minutes.
+// Preset chips plus '직접 입력', which opens minute/second fields for any length up to 99 minutes.
 function PanelChips({ label, options, value, onChange, min = 0 }) {
   const preset = options.some(([v]) => v === value);
   const [custom, setCustom] = useState(!preset);
@@ -58,7 +58,7 @@ function PanelChips({ label, options, value, onChange, min = 0 }) {
           <button key={l} className="chip dark tight" onClick={() => { setCustom(false); onChange(v); }}
             style={!custom && v === value ? on : undefined}>{l}</button>
         ))}
-        <button className="chip dark tight" onClick={() => setCustom(true)} style={custom ? on : undefined}>직접</button>
+        <button className="chip dark tight" onClick={() => setCustom(true)} style={custom ? on : undefined}>직접 입력</button>
       </div>
       {custom && (
         <div className="time-input">
