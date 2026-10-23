@@ -42,16 +42,32 @@ export function MiniTimer({ timer, timerRef, onClick }) {
   );
 }
 
-function PanelChips({ label, options, value, onChange }) {
+// Preset chips plus '직접', which opens minute/second fields for any length up to 99 minutes.
+function PanelChips({ label, options, value, onChange, min = 0 }) {
+  const preset = options.some(([v]) => v === value);
+  const [custom, setCustom] = useState(!preset);
+  const on = { background: 'var(--cream)', color: 'var(--ink)' };
+  const set = (m, s) => onChange(Math.max(min, Math.min(99, m) * 60 + Math.min(59, s)));
+  const num = v => Math.max(0, parseInt(v, 10) || 0);
+  const m = Math.floor(value / 60), s = value % 60;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <span className="label" style={{ color: 'var(--muted-2)' }}>{label}</span>
       <div className="chip-row tight">
         {options.map(([v, l]) => (
-          <button key={l} className="chip dark tight" onClick={() => onChange(v)}
-            style={v === value ? { background: 'var(--cream)', color: 'var(--ink)' } : undefined}>{l}</button>
+          <button key={l} className="chip dark tight" onClick={() => { setCustom(false); onChange(v); }}
+            style={!custom && v === value ? on : undefined}>{l}</button>
         ))}
+        <button className="chip dark tight" onClick={() => setCustom(true)} style={custom ? on : undefined}>직접</button>
       </div>
+      {custom && (
+        <div className="time-input">
+          <input type="number" inputMode="numeric" min="0" max="99" value={m} onChange={ev => set(num(ev.target.value), s)} aria-label={label + ' 분'} />
+          <span>분</span>
+          <input type="number" inputMode="numeric" min="0" max="59" value={s} onChange={ev => set(m, num(ev.target.value))} aria-label={label + ' 초'} />
+          <span>초</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -114,7 +130,7 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
           </div>
           <div className="timer-panel">
             <PanelChips label="준비 시간" options={PREPS} value={prep} onChange={setPrep} />
-            <PanelChips label="답변 시간" options={ANSS} value={ans} onChange={setAns} />
+            <PanelChips label="답변 시간" options={ANSS} value={ans} onChange={setAns} min={10} />
             <div style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--muted-2)' }}>준비 시간이 끝나면 자동으로 답변 시간이 시작되고, 전환·종료 시 알림음이 울립니다.</div>
           </div>
         </div>
