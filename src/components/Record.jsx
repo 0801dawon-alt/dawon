@@ -31,8 +31,8 @@ export const RUBRIC = [
     levels: ['현실과 맞는 구체적 사례·작동 방식으로 각 주장을 뒷받침', '구체적 근거가 있으나 일부 주장은 추상적', '상식적 이유는 있으나 대부분 일반론', '구호성 주장 위주로 근거가 거의 없음', '근거가 없거나 사실과 다름'] },
   { k: '반론·대안', max: 15, what: '가장 강한 반대 논거를 제시하고 재반박했는가, 부작용을 고려한 현실적 대안이나 조건을 냈는가',
     levels: ['가장 강한 반론을 정확히 세우고 재반박, 부작용까지 고려한 대안 제시', '반론과 재반박은 있으나 대안이나 부작용 검토가 얕음', '반론을 언급만 하고 넘어가거나 약한 반론만 다룸', '반대 입장을 왜곡하거나 무시함', '반론·대안 고려가 전혀 없음'] },
-  { k: '구조·전달', max: 15, what: '두괄식 구조, 단계 표시(첫째·둘째), 간결한 문장, 군말, 주어진 시간 활용',
-    levels: ['결론-근거-반론-마무리가 귀에 들리게 정리, 시간 활용 적절, 군말 거의 없음', '구조는 보이나 일부 장황하거나 마무리가 약함', '구조가 흐릿해 요점을 따라가기 어려운 구간이 있음', '두서없이 이어지고 반복·군말이 잦음', '구조가 없고 시간 활용이 크게 어긋남'] },
+  { k: '구조·전달', max: 15, what: '두괄식 구조, 단계 표시(첫째·둘째), 간결한 문장, 군말',
+    levels: ['결론-근거-반론-마무리가 귀에 들리게 정리, 문장이 간결하고 군말 거의 없음', '구조는 보이나 일부 장황하거나 마무리가 약함', '구조가 흐릿해 요점을 따라가기 어려운 구간이 있음', '두서없이 이어지고 반복·군말이 잦음', '구조가 없어 요점을 알아듣기 어려움'] },
 ];
 const LEVELS = ['상', '중상', '중', '중하', '하'];
 // Share of a criterion's points each level may take: [low, high].
@@ -45,13 +45,11 @@ async function evaluate(at, text, entry) {
   const fl = countFillers(text), cpm = at.dur ? Math.round(text.replace(/\s/g, '').length / (at.dur / 60)) : 0;
   const limit = at.limit || 120, target = Math.round(limit / 60 * CHARS_PER_MIN);
   const withPassage = !!at.context;
-  const chars = text.replace(/\s/g, '').length, fillerN = Object.values(fl).reduce((a, b) => a + b, 0);
-  const usedPct = at.dur ? Math.round(at.dur / limit * 100) : null, fillPct = Math.round(chars / target * 100);
+  const fillerN = Object.values(fl).reduce((a, b) => a + b, 0);
   let fb = parseJSON(await ask(`너는 한국 로스쿨 구술면접에 여러 해 들어간 법학 교수이자 평가위원이다.\n${LAW_GUIDE}
 아래는 지원자의 실제 답변을 음성 인식으로 전사한 것이다(띄어쓰기·맞춤법 같은 인식 오류는 감점하지 마라). 아래 평가 기준표를 그대로 적용해 채점하라.
 [질문] ${at.q}
-${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[주어진 답변 시간] ${Math.round(limit / 60 * 10) / 10}분 (적정 분량 공백 제외 약 ${target}자)
-[실제 답변] ${at.dur ? `${at.dur}초(주어진 시간의 ${usedPct}%), ` : ''}공백 제외 ${chars}자(적정 분량의 ${fillPct}%), 분당 ${cpm || '—'}자, 군말 ${fillerN}회
+${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[군말] ${fillerN}회
 [답변 전사]
 ${text}
 ${entry ? '[참고 쟁점] ' + (entry.issues || []).join(' / ') : ''}
@@ -62,8 +60,8 @@ ${rubricText}
 [채점 절차]
 1. 항목마다 먼저 답변에서 근거가 되는 표현을 그대로 인용하고(evidence), 그 표현이 어느 수준의 설명에 맞는지 고른 뒤(level), 그 수준의 점수 범위 안에서 점수를 정한다. 인용할 표현이 없으면 그 항목은 '중' 이상을 줄 수 없다.
 2. 항목은 서로 독립적으로 채점한다. 전체 인상으로 모든 항목에 비슷한 비율을 주지 마라. 잘한 항목과 못한 항목의 차이가 점수에 드러나야 한다.
-3. 분량·시간: 적정 분량의 50% 미만이면 '근거 구체성'과 '구조·전달'은 '중하' 이하, 70% 미만이면 '중' 이하로 한다. 주어진 시간을 20% 넘게 초과했으면 deductions에 2~5점 감점을 넣는다.
-4. 감점 사항(deductions): 질문 회피, 명백한 사실 오류, 지원자 본인 신상을 드러내는 발언, 시간 초과만 해당한다. 없으면 빈 배열.
+3. 답변 시간과 분량(길이)은 평가하지 않는다. 답변이 짧거나 길다는 이유로 점수를 깎거나 고칠 점으로 지적하지 말고, 말한 내용의 질로만 판단한다.
+4. 감점 사항(deductions): 질문 회피, 명백한 사실 오류, 지원자 본인 신상을 드러내는 발언만 해당한다. 없으면 빈 배열.
 5. 점수 분포: 실제 면접 지원자 평균은 60점대다. 90점 이상은 거의 흠잡을 데 없는 답변에만, 80점대는 합격권 답변에만 준다. 무난하지만 평범한 답변은 60~70점대, 근거나 반론이 빠진 답변은 50점대 이하가 맞다. 관대하게 채점하지 마라.
 ${withPassage ? '6. 제시문이 주어진 문항이다. 제시문의 내용과 표현을 정확히 인용·활용했는지를 쟁점 파악과 근거 구체성에 반영하라.' : '6. 자료 없이 답하는 면접이다. 정확한 수치·통계·조문·연도는 요구하지 않는다. 상식 수준의 사례와 이유가 주장과 잘 연결되는지로 평가하고, 수치가 없다는 이유로 감점하거나 지적하지 마라.'}
 
@@ -86,20 +84,19 @@ JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중
   } else {
     markUnreadable();
     // Rule-based scoring on the same rubric when Claude is unavailable.
-    const short = fillPct < 50 ? 0.6 : fillPct < 70 ? 0.8 : 1;
     const pick = (k, ratio) => Math.round(max[k] * ratio);
     const s = {
       '쟁점 파악': pick('쟁점 파악', 0.6),
       '입장 명확성': pick('입장 명확성', /(찬성|반대|생각합니다|해야 합니다|결론)/.test(text.slice(0, 120)) ? 0.75 : 0.5),
       '논증 타당성': pick('논증 타당성', /(때문|왜냐하면|따라서|그러므로)/.test(text) ? 0.6 : 0.45),
-      '근거 구체성': pick('근거 구체성', (REASON.test(text) ? 0.6 : 0.4) * short),
+      '근거 구체성': pick('근거 구체성', REASON.test(text) ? 0.6 : 0.4),
       '반론·대안': pick('반론·대안', COUNTER.test(text) ? 0.6 : 0.3),
-      '구조·전달': pick('구조·전달', Math.max(0.3, (/(첫째|둘째|결론적으로|정리하면)/.test(text) ? 0.7 : 0.55) - fillerN * 0.03) * short),
+      '구조·전달': pick('구조·전달', Math.max(0.3, (/(첫째|둘째|결론적으로|정리하면)/.test(text) ? 0.7 : 0.55) - fillerN * 0.03)),
     };
     fb = {
       scores: s, max, total: Object.values(s).reduce((a, b) => a + b, 0),
       summary: 'Claude 평가를 받지 못해 간단한 규칙 기반으로 평가했습니다. ' + lastAiIssue(),
-      strengths: chars > target * 0.7 ? ['주어진 시간에 맞는 분량으로 답변했습니다'] : [],
+      strengths: [],
       weaknesses: [...(fillerN > 3 ? ['군말이 ' + fillerN + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
       better: '', strengthTags: [],
       weakTags: [...(fillerN > 3 ? ['군말 과다'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
