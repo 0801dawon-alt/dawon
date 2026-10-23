@@ -107,14 +107,19 @@ export default function App() {
   const [notes, setNotes] = useState(null);
   const notesRef = useRef(notes); notesRef.current = notes;
   const noteTimers = useRef({});
+  // Article clippings per topic: [{id, source, text}], kept like notes.
+  const [scraps, setScraps] = useState(null);
+  const scrapsRef = useRef(scraps); scrapsRef.current = scraps;
+  const scrapTimers = useRef({});
   useEffect(() => {
     let live = true, conn = null;
     connectRecords({
-      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current, viewed: viewedRef.current },
+      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current, viewed: viewedRef.current, scraps: Object.fromEntries(entries.filter(e => (e.scraps || []).length).map(e => [e.id, e.scraps])) },
       onAttempts: list => { if (!live) return; attemptsRef.current = list; setAttempts(list); },
       onAnalysis: an => { if (live) setAnalysisState(an); },
       onMyQuestions: list => { if (live) setMyQuestions(list); },
       onViewed: ids => { if (live) setViewed(ids); },
+      onScraps: map => { if (live) setScraps(prev => { const next = { ...map }; Object.keys(scrapTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
       // Keep text still waiting to be written so a sync never rolls back what is being typed.
       onNotes: map => { if (live) setNotes(prev => { const next = { ...map }; Object.keys(noteTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
       onFail: () => {
@@ -124,7 +129,8 @@ export default function App() {
         saveJSON(MYQ_KEY, myQRef.current);
         saveJSON(VIEWED_KEY, viewedRef.current);
         const n = notesRef.current;
-        if (n) save(list => list.map(e => (e.id in n ? { ...e, myView: n[e.id] } : e)));
+        const sc = scrapsRef.current;
+        if (n || sc) save(list => list.map(e => ({ ...e, ...(n && e.id in n ? { myView: n[e.id] } : {}), ...(sc && e.id in sc ? { scraps: sc[e.id] } : {}) })));
         flash('Claude 계정에 저장할 수 없어 이 브라우저에 저장합니다');
       },
     }).then(r => { if (!live) { r && r.unsubscribe(); return; } conn = r; if (r) { remote.current = r; setRecordsRemote(true); } })
@@ -194,7 +200,14 @@ export default function App() {
 
   const validId = id => (id && entries.some(e => e.id === id) ? id : entries[0] && entries[0].id) || '';
   const odBase = entries.find(e => e.id === openId) || null;
-  const od = odBase && notes && remote.current ? { ...odBase, myView: notes[odBase.id] ?? odBase.myView ?? '' } : odBase;
+  const od = odBase && remote.current ? { ...odBase, myView: (notes && notes[odBase.id]) ?? odBase.myView ?? '', scraps: (scraps && scraps[odBase.id]) ?? odBase.scraps ?? [] } : odBase;
+  const onScrapsChange = (id, items) => {
+    const r = remote.current;
+    if (!r) { updateEntry(id, { scraps: items }); return; }
+    setScraps(m => ({ ...(m || {}), [id]: items }));
+    clearTimeout(scrapTimers.current[id]);
+    scrapTimers.current[id] = setTimeout(() => { delete scrapTimers.current[id]; r.putScraps(id, items); }, 800);
+  };
   const onMyView = (id, text) => {
     const r = remote.current;
     if (!r) { updateEntry(id, { myView: text }); return; }
@@ -313,6 +326,7 @@ export default function App() {
           onDelete={() => { save(prev => prev.filter(e => e.id !== od.id)); setOpenId(null); flash('삭제했습니다'); }}
           onPractice={practice}
           onMyView={v => onMyView(od.id, v)}
+          onScraps={items => onScrapsChange(od.id, items)}
           onSaveModel={(q, t) => updateEntry(od.id, { models: { ...(odBase.models || {}), [q]: t } })}
           onToQuestions={() => { setQTopic(od.id); setOpenId(null); scroll('q'); }}
           onToPassage={() => { setPTopic(od.id); setOpenId(null); scroll('p'); }}

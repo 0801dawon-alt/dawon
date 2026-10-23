@@ -60,6 +60,32 @@ function QuestionRow({ entry, q, onPractice, onSaveModel }) {
   );
 }
 
+// Article clippings: one slot per article, split by a rule, each with its source and text.
+function Scraps({ items, onChange }) {
+  // The empty slot shown before anything is saved keeps one id, so typing into it doesn't remount it.
+  const blank = useRef('c' + Date.now().toString(36));
+  const list = items.length ? items : [{ id: blank.current, source: '', text: '', blank: true }];
+  const change = (id, patch) => onChange(list.map(({ blank, ...x }) => (x.id === id ? { ...x, ...patch } : x)));
+  const add = () => onChange([...items.filter(x => x.source || x.text), { id: 'c' + Date.now().toString(36), source: '', text: '' }]);
+  const remove = id => onChange(items.filter(x => x.id !== id));
+  return (
+    <div className="scraps">
+      <div className="scraps-head"><span>기사 스크랩</span><span style={{ fontWeight: 400 }}>기사마다 한 칸씩 붙여 넣으세요</span></div>
+      {list.map((x, i) => (
+        <div key={x.id} className="scrap">
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', width: 22 }}>{String(i + 1).padStart(2, '0')}</span>
+            <input className="scrap-source" value={x.source} onChange={ev => change(x.id, { source: ev.target.value })} placeholder="출처 · 기사 제목이나 링크" />
+            {!x.blank && <span className="link" style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }} onClick={() => remove(x.id)}>삭제</span>}
+          </div>
+          <textarea className="scrap-text" rows={3} value={x.text} onChange={ev => change(x.id, { text: ev.target.value })} placeholder="기사에서 옮겨 둘 내용을 붙여 넣으세요." />
+        </div>
+      ))}
+      <button className="scrap-add" onClick={add}>+ 스크랩 칸 추가</button>
+    </div>
+  );
+}
+
 // One reason per row; wrapped lines start under the text, not under the check mark.
 function Reasons({ items, dark }) {
   return items.map((x, i) => (
@@ -77,7 +103,7 @@ export function ConfirmLink({ label, armedLabel, onConfirm, style }) {
   return <span className="link" style={style} onClick={() => (armed ? onConfirm() : setArmed(true))} onMouseLeave={() => setArmed(false)}>{armed ? armedLabel : label}</span>;
 }
 
-export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onSaveModel, onMyView, onToQuestions, onToPassage }) {
+export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onSaveModel, onMyView, onScraps, onToQuestions, onToPassage }) {
   // Case links only where real rulings exist: 대법원 (S) and/or 헌법재판소 (C).
   const fix = PROCON[od.id];
   const pc = { motion: fix ? fix.motion : '', pro: fix ? fix.pro : (od.pro || []), con: fix ? fix.con : (od.con || []) };
@@ -135,11 +161,11 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,240px),1fr))', gap: 1, background: 'var(--ink)', border: '1px solid var(--ink)' }}>
                 <div style={{ background: 'var(--paper)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>{pc.motion ? '찬성 · 논제에 찬성하는 근거' : '찬성 · 긍정'}</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>찬성 · 긍정</div>
                   <Reasons items={pc.pro} />
                 </div>
                 <div style={{ background: 'var(--charcoal)', color: 'var(--cream)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>{pc.motion ? '반대 · 논제에 반대하는 근거' : '반대 · 우려'}</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 16 }}>반대 · 우려</div>
                   <Reasons items={pc.con} dark />
                 </div>
               </div>
@@ -186,6 +212,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
             <div style={sectionLabel}>나의 생각</div>
             <textarea value={od.myView || ''} onChange={ev => onMyView(ev.target.value)} rows={5} placeholder="이 주제에 대한 나의 입장, 근거, 경험을 적어두세요."
               style={{ font: 'inherit', fontSize: 15, lineHeight: 1.8, padding: 16, background: '#fff', border: '1px solid var(--line)', outline: 'none', resize: 'vertical', color: 'var(--ink)' }} />
+            <Scraps items={od.scraps || []} onChange={onScraps} />
           </div>
           {od.body && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
