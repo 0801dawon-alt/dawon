@@ -31,7 +31,10 @@ function NumberShape({ entry, index }) {
 const Library = forwardRef(function Library({ entries, categories, cat, setCat, search, setSearch, page, setPage, onOpen, viewed, onNew }, ref) {
   const PER_PAGE = usePerPage();
   const q = search.trim().toLowerCase();
-  const filtered = entries.filter(e => (cat === '전체' || e.category === cat) && (!q || [e.title, e.summary, ...(e.keywords || [])].join(' ').toLowerCase().includes(q)));
+  // Numbers come from the category list before searching, so a topic keeps its number in search results.
+  const inCat = entries.filter(e => cat === '전체' || e.category === cat);
+  const numOf = new Map(inCat.map((e, i) => [e.id, i]));
+  const filtered = inCat.filter(e => !q || [e.title, e.summary, ...(e.keywords || [])].join(' ').toLowerCase().includes(q));
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const cur = Math.min(page, pages - 1);
   const start = cur * PER_PAGE;
@@ -66,7 +69,7 @@ const Library = forwardRef(function Library({ entries, categories, cat, setCat, 
           {filtered.slice(start, start + PER_PAGE).map((e, i0) => (
             <article key={e.id} className="card" data-reveal="1" data-d={(i0 % 4) * 90} onClick={() => onOpen(e.id)}>
               <div className="card-top">
-                <NumberShape entry={e} index={start + i0} />
+                <NumberShape entry={e} index={numOf.get(e.id)} />
                 <span className="card-cat"><span style={{ width: 7, height: 7, background: catColor(e.category) }} />{e.category}</span>
               </div>
               <h3>{e.title}</h3>
