@@ -154,6 +154,26 @@ export default function App() {
     if (remote.current) remote.current.putViewed(ids); else saveJSON(VIEWED_KEY, ids);
   };
   const saveMyQuestions = list => { setMyQuestions(list); myQRef.current = list; if (remote.current) remote.current.putMyQuestions(list); else saveJSON(MYQ_KEY, list); };
+  // Questions carried between the claude.ai page and the recording homepage join the list once.
+  const mergeMyQuestions = qs => {
+    const have = new Set(myQRef.current.map(x => x.q.trim()));
+    const add = [...new Set(qs.map(s => (s || '').trim()))].filter(s => s && !have.has(s));
+    if (!add.length) return 0;
+    const now = Date.now();
+    saveMyQuestions([...add.map((q, i) => ({ id: uid(), q, date: new Date(now - i).toISOString() })), ...myQRef.current]);
+    return add.length;
+  };
+  // The claude.ai page opens the homepage with #carry=… holding the question list and current question.
+  useEffect(() => {
+    const m = location.hash.match(/^#carry=(.+)$/);
+    if (!m) return;
+    try {
+      const c = JSON.parse(decodeURIComponent(m[1]));
+      mergeMyQuestions(c.mq || []);
+      if (c.q) setTQuestion(c.q);
+    } catch { /* malformed link */ }
+    history.replaceState(null, '', location.pathname + location.search);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Say why a generator fell back to its template text.
@@ -305,7 +325,8 @@ export default function App() {
       <Record
         ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} context={tContext} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
         onFinish={() => setTimer(finishTimer)}
-        onPractice={practice} flash={flash}
+        onPractice={practice} flash={flash} myQuestions={myQuestions}
+        onCarryQuestions={qs => { const n = mergeMyQuestions(qs); if (n) flash(`홈페이지에서 입력한 질문 ${n}개를 질문 목록에 보관했어요`); }}
       />
       <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onOpenBook={() => setBookOpen(true)}
         bookCount={new Set([...myQuestions.map(x => x.q.trim()), ...attempts.filter(a => a.q && a.q !== '(질문 없음)').map(a => a.q.trim())]).size} onPractice={practice} flash={flash} />

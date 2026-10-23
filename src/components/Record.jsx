@@ -17,38 +17,94 @@ const REASON = /(예를 들어|예컨대|사례|때문|왜냐하면|그 결과)/
 // Spoken Korean runs about 300 characters (spaces excluded) a minute.
 const CHARS_PER_MIN = 300;
 
+// Scoring rubric, written the way a law school oral-interview panel grades: six criteria with
+// unequal weights, five anchored levels each, and the total computed here from the parts.
+export const RUBRIC = [
+  { k: '쟁점 파악', max: 20, what: '질문이 실제로 묻는 것에 답했는가, 대립하는 가치·이해관계를 정확히 짚었는가',
+    levels: ['핵심 대립축을 스스로 명명하고 그 축 위에서 답을 전개', '핵심 쟁점은 잡았으나 대립 구도 설명이 얕음', '주제에는 답했으나 질문의 초점이 흐려지거나 일부만 답함', '질문을 넓게·다르게 해석해 초점에서 벗어남', '질문을 회피하거나 오해함'] },
+  { k: '입장 명확성', max: 10, what: '처음부터 분명한 결론을 내리고 끝까지 일관되게 유지했는가',
+    levels: ['첫 문장에 결론, 조건과 범위까지 분명하고 끝까지 일관', '결론은 분명하나 뒤늦게 나오거나 범위가 모호', '입장은 있으나 양쪽을 오가며 흐려짐', '"둘 다 중요하다" 식으로 판단을 미룸', '입장이 없거나 앞뒤가 모순'] },
+  { k: '논증 타당성', max: 25, what: '근거에서 결론으로 가는 연결이 비약 없이 성립하는가, 판단 기준이 일관되는가',
+    levels: ['근거마다 왜 결론을 지지하는지 설명되고 판단 기준이 하나로 일관', '대체로 타당하나 한 군데 연결이 약하거나 전제가 숨어 있음', '근거를 나열할 뿐 결론과의 연결 설명이 부족', '비약·순환논증·일반화 오류가 눈에 띔', '근거가 결론을 지지하지 못하거나 서로 충돌'] },
+  { k: '근거 구체성', max: 15, what: '주장마다 현실에 맞는 구체적 이유·사례·제도를 들었는가',
+    levels: ['현실과 맞는 구체적 사례·작동 방식으로 각 주장을 뒷받침', '구체적 근거가 있으나 일부 주장은 추상적', '상식적 이유는 있으나 대부분 일반론', '구호성 주장 위주로 근거가 거의 없음', '근거가 없거나 사실과 다름'] },
+  { k: '반론·대안', max: 15, what: '가장 강한 반대 논거를 제시하고 재반박했는가, 부작용을 고려한 현실적 대안이나 조건을 냈는가',
+    levels: ['가장 강한 반론을 정확히 세우고 재반박, 부작용까지 고려한 대안 제시', '반론과 재반박은 있으나 대안이나 부작용 검토가 얕음', '반론을 언급만 하고 넘어가거나 약한 반론만 다룸', '반대 입장을 왜곡하거나 무시함', '반론·대안 고려가 전혀 없음'] },
+  { k: '구조·전달', max: 15, what: '두괄식 구조, 단계 표시(첫째·둘째), 간결한 문장, 군말, 주어진 시간 활용',
+    levels: ['결론-근거-반론-마무리가 귀에 들리게 정리, 시간 활용 적절, 군말 거의 없음', '구조는 보이나 일부 장황하거나 마무리가 약함', '구조가 흐릿해 요점을 따라가기 어려운 구간이 있음', '두서없이 이어지고 반복·군말이 잦음', '구조가 없고 시간 활용이 크게 어긋남'] },
+];
+const LEVELS = ['상', '중상', '중', '중하', '하'];
+// Share of a criterion's points each level may take: [low, high].
+const BANDS = [[0.9, 1], [0.75, 0.85], [0.55, 0.7], [0.35, 0.5], [0, 0.3]];
+export const GRADES = [[90, '최상위 합격권'], [80, '합격권'], [70, '무난하나 약점 뚜렷'], [60, '평균 이하'], [50, '부족'], [0, '미흡']];
+export const gradeOf = t => (GRADES.find(([min]) => t >= min) || GRADES[GRADES.length - 1])[1];
+const rubricText = RUBRIC.map((r, i) => `${i + 1}. ${r.k} (${r.max}점) — ${r.what}\n` + r.levels.map((d, j) => `   ${LEVELS[j]}(${Math.round(BANDS[j][0] * r.max)}~${Math.round(BANDS[j][1] * r.max)}점): ${d}`).join('\n')).join('\n');
+
 async function evaluate(at, text, entry) {
   const fl = countFillers(text), cpm = at.dur ? Math.round(text.replace(/\s/g, '').length / (at.dur / 60)) : 0;
   const limit = at.limit || 120, target = Math.round(limit / 60 * CHARS_PER_MIN);
   const withPassage = !!at.context;
-  let fb = parseJSON(await ask(`너는 한국 로스쿨 구술면접 평가위원이다.\n${LAW_GUIDE}\n 아래는 지원자의 실제 답변을 음성 인식으로 전사한 것이다(인식 오류 가능성 감안). 엄격하고 구체적으로 평가하라.
+  const chars = text.replace(/\s/g, '').length, fillerN = Object.values(fl).reduce((a, b) => a + b, 0);
+  const usedPct = at.dur ? Math.round(at.dur / limit * 100) : null, fillPct = Math.round(chars / target * 100);
+  let fb = parseJSON(await ask(`너는 한국 로스쿨 구술면접에 여러 해 들어간 법학 교수이자 평가위원이다.\n${LAW_GUIDE}
+아래는 지원자의 실제 답변을 음성 인식으로 전사한 것이다(띄어쓰기·맞춤법 같은 인식 오류는 감점하지 마라). 아래 평가 기준표를 그대로 적용해 채점하라.
 [질문] ${at.q}
-${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[주어진 답변 시간] ${Math.round(limit / 60 * 10) / 10}분
-[실제 답변 시간] ${at.dur}초, 분당 ${cpm}자
+${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[주어진 답변 시간] ${Math.round(limit / 60 * 10) / 10}분 (적정 분량 공백 제외 약 ${target}자)
+[실제 답변] ${at.dur ? `${at.dur}초(주어진 시간의 ${usedPct}%), ` : ''}공백 제외 ${chars}자(적정 분량의 ${fillPct}%), 분당 ${cpm || '—'}자, 군말 ${fillerN}회
 [답변 전사]
 ${text}
 ${entry ? '[참고 쟁점] ' + (entry.issues || []).join(' / ') : ''}
-평가 기준: 논리성(주장-근거 연결), 근거(주장을 뒷받침하는 이유와 사례), 구조(결론 선제시·두괄식·마무리), 전달력(문장 간결성, 군말, 시간 활용), 쟁점이해(대립 지점 파악, 반론 고려). 각 0~20점.
-${withPassage ? '제시문이 주어진 문항이다. 제시문의 내용과 표현을 정확히 인용·활용했는지를 근거와 쟁점이해 평가에 반영하라.' : '자료 없이 답하는 면접이다. 정확한 수치·통계·조문·연도까지 요구하지 말고, 상식 수준의 사례와 논리적 이유가 주장과 잘 연결되는지로 평가하라. 수치가 없다는 이유로 감점하거나 지적하지 마라.'}
-잘한 점·고칠 점은 답변의 실제 표현을 짚어 구체적으로 쓰고, 누적 비교용 짧은 라벨(예: '결론 먼저 제시', '근거와 주장 연결 약함', '반론 미고려', '군말 과다')을 strengthTags/weakTags에 넣어라.
-마지막으로 이 질문에 대한 모범답안을 실제로 말하는 문장으로 써라. 주어진 답변 시간 ${Math.round(limit / 60 * 10) / 10}분 동안 말할 분량, 즉 공백 제외 약 ${target}자에 맞추고, 결론 → 근거 2~3개 → 반론 고려 → 마무리 구조를 따른다.${withPassage ? ' 제시문을 충분히 인용·활용하라.' : ' 지어낸 통계나 수치는 쓰지 마라.'}
-JSON만 출력: {"total":0,"scores":{"논리성":0,"근거":0,"구조":0,"전달력":0,"쟁점이해":0},"summary":"2문장 총평","strengths":["..."],"weaknesses":["..."],"better":"보완한 답변의 뼈대(3~4문장)","model":"모범답안","strengthTags":["..."],"weakTags":["..."]}`));
-  if (!fb || !fb.scores) {
+
+[평가 기준표 · 100점]
+${rubricText}
+
+[채점 절차]
+1. 항목마다 먼저 답변에서 근거가 되는 표현을 그대로 인용하고(evidence), 그 표현이 어느 수준의 설명에 맞는지 고른 뒤(level), 그 수준의 점수 범위 안에서 점수를 정한다. 인용할 표현이 없으면 그 항목은 '중' 이상을 줄 수 없다.
+2. 항목은 서로 독립적으로 채점한다. 전체 인상으로 모든 항목에 비슷한 비율을 주지 마라. 잘한 항목과 못한 항목의 차이가 점수에 드러나야 한다.
+3. 분량·시간: 적정 분량의 50% 미만이면 '근거 구체성'과 '구조·전달'은 '중하' 이하, 70% 미만이면 '중' 이하로 한다. 주어진 시간을 20% 넘게 초과했으면 deductions에 2~5점 감점을 넣는다.
+4. 감점 사항(deductions): 질문 회피, 명백한 사실 오류, 지원자 본인 신상을 드러내는 발언, 시간 초과만 해당한다. 없으면 빈 배열.
+5. 점수 분포: 실제 면접 지원자 평균은 60점대다. 90점 이상은 거의 흠잡을 데 없는 답변에만, 80점대는 합격권 답변에만 준다. 무난하지만 평범한 답변은 60~70점대, 근거나 반론이 빠진 답변은 50점대 이하가 맞다. 관대하게 채점하지 마라.
+${withPassage ? '6. 제시문이 주어진 문항이다. 제시문의 내용과 표현을 정확히 인용·활용했는지를 쟁점 파악과 근거 구체성에 반영하라.' : '6. 자료 없이 답하는 면접이다. 정확한 수치·통계·조문·연도는 요구하지 않는다. 상식 수준의 사례와 이유가 주장과 잘 연결되는지로 평가하고, 수치가 없다는 이유로 감점하거나 지적하지 마라.'}
+
+잘한 점·고칠 점은 답변의 실제 표현을 짚어 구체적으로 쓴다. 고칠 점에는 "어떤 문장을 어떻게 바꾸면 되는지"를 담는다. 누적 비교용 짧은 라벨(예: '결론 먼저 제시', '근거와 주장 연결 약함', '반론 미고려', '군말 과다')을 strengthTags/weakTags에 넣는다.
+마지막으로 모범답안을 실제로 말하는 문장으로 쓴다. 공백 제외 약 ${target}자, 결론 → 근거 2~3개 → 가장 강한 반론과 재반박 → 마무리 구조.${withPassage ? ' 제시문을 충분히 인용·활용하라.' : ' 지어낸 통계나 수치는 쓰지 마라.'}
+JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중하|하","score":0,"evidence":"답변 인용","reason":"이 수준으로 본 이유 1~2문장"}, …6개 항목 모두 위 순서대로],"deductions":[{"reason":"…","points":0}],"summary":"교수의 총평 2~3문장","strengths":["…"],"weaknesses":["…"],"better":"보완한 답변의 뼈대(3~4문장)","model":"모범답안","strengthTags":["…"],"weakTags":["…"]}`));
+  const max = Object.fromEntries(RUBRIC.map(r => [r.k, r.max]));
+  if (fb && Array.isArray(fb.criteria) && fb.criteria.length) {
+    // Keep each score inside its criterion's range and recompute the total here.
+    const criteria = RUBRIC.map(r => {
+      const c = fb.criteria.find(x => x && x.name === r.k) || {};
+      const li = LEVELS.indexOf(c.level);
+      // A score outside the chosen level's band is pulled back into it.
+      const [lo, hi] = li < 0 ? [0, r.max] : [Math.round(BANDS[li][0] * r.max), Math.round(BANDS[li][1] * r.max)];
+      return { name: r.k, max: r.max, level: li < 0 ? '' : c.level, score: Math.max(lo, Math.min(hi, Math.round(+c.score || 0))), evidence: c.evidence || '', reason: c.reason || '' };
+    });
+    const deductions = (fb.deductions || []).filter(d => d && +d.points > 0).map(d => ({ reason: d.reason || '', points: Math.min(10, Math.round(+d.points)) }));
+    const sum = criteria.reduce((a, c) => a + c.score, 0) - deductions.reduce((a, d) => a + d.points, 0);
+    fb = { ...fb, criteria, deductions, scores: Object.fromEntries(criteria.map(c => [c.name, c.score])), max, total: Math.max(0, Math.min(100, sum)) };
+  } else {
     markUnreadable();
-    // Rule-based scoring when AI is unavailable.
-    const words = text.split(/\s+/).length, fn = Object.values(fl).reduce((a, b) => a + b, 0);
-    const s5 = { 논리성: 12, 근거: REASON.test(text) ? 14 : 10, 구조: /(결론|첫째|둘째|따라서|그래서)/.test(text) ? 14 : 10, 전달력: Math.max(6, 18 - fn), 쟁점이해: COUNTER.test(text) ? 14 : 9 };
+    // Rule-based scoring on the same rubric when Claude is unavailable.
+    const short = fillPct < 50 ? 0.6 : fillPct < 70 ? 0.8 : 1;
+    const pick = (k, ratio) => Math.round(max[k] * ratio);
+    const s = {
+      '쟁점 파악': pick('쟁점 파악', 0.6),
+      '입장 명확성': pick('입장 명확성', /(찬성|반대|생각합니다|해야 합니다|결론)/.test(text.slice(0, 120)) ? 0.75 : 0.5),
+      '논증 타당성': pick('논증 타당성', /(때문|왜냐하면|따라서|그러므로)/.test(text) ? 0.6 : 0.45),
+      '근거 구체성': pick('근거 구체성', (REASON.test(text) ? 0.6 : 0.4) * short),
+      '반론·대안': pick('반론·대안', COUNTER.test(text) ? 0.6 : 0.3),
+      '구조·전달': pick('구조·전달', Math.max(0.3, (/(첫째|둘째|결론적으로|정리하면)/.test(text) ? 0.7 : 0.55) - fillerN * 0.03) * short),
+    };
     fb = {
-      scores: s5, total: Object.values(s5).reduce((a, b) => a + b, 0),
+      scores: s, max, total: Object.values(s).reduce((a, b) => a + b, 0),
       summary: 'Claude 평가를 받지 못해 간단한 규칙 기반으로 평가했습니다. ' + lastAiIssue(),
-      strengths: words > 80 ? ['충분한 분량으로 답변했습니다'] : [],
-      weaknesses: [...(fn > 3 ? ['군말이 ' + fn + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
+      strengths: chars > target * 0.7 ? ['주어진 시간에 맞는 분량으로 답변했습니다'] : [],
+      weaknesses: [...(fillerN > 3 ? ['군말이 ' + fillerN + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
       better: '', strengthTags: [],
-      weakTags: [...(fn > 3 ? ['군말 과다'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
+      weakTags: [...(fillerN > 3 ? ['군말 과다'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
     };
   }
-  if (typeof fb.total !== 'number') fb.total = Object.values(fb.scores).reduce((a, b) => a + (+b || 0), 0);
-  return { ...fb, fillers: fl, cpm };
+  return { ...fb, grade: gradeOf(fb.total), fillers: fl, cpm };
 }
 
 async function nextFollowup(at, prev) {
@@ -81,14 +137,19 @@ const GUIDE = TOUCH ? [
   ['Windows 11이라면', 'Windows 키 + H 음성 입력이 한국어를 지원할 수도 있어요. 입력 언어를 한국어로 바꾼 뒤 시도해 보세요.'],
 ];
 
-// Format the homepage copies for the claude.ai page: [질문] ...\n[답변] ...
-const HANDOFF = /^\s*\[질문\]\s*([^\n]*)\n\[답변\]\s*([\s\S]*)$/;
+// Format the homepage copies for the claude.ai page: [질문] ...\n[답변] ...\n[내 질문 목록]\n- ...
+// The question list carries questions typed on the homepage back to the claude.ai page.
+const HANDOFF = /^\s*\[질문\]\s*([^\n]*)\n\[답변\]\s*([\s\S]*?)(?:\n\[내 질문 목록\]\n([\s\S]*))?$/;
+const QLIST = '\n[내 질문 목록]\n';
+// The homepage link carries the question list and the current question in its hash.
+const carryLink = (myQuestions, q) => HOMEPAGE_URL + '#carry=' + encodeURIComponent(JSON.stringify({ mq: myQuestions.map(x => x.q), q: q || '' }));
 
 const darkLabel = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-3)' };
 
 // 05 답변 녹음·피드백. Recording starts when the timer enters the answer phase and
 // stops (and saves an attempt) when it leaves it.
-export const Record = forwardRef(function Record({ timer, question, setQuestion, context, entries, attempts, saveAttempts, onFinish, onPractice, flash }, ref) {
+export const Record = forwardRef(function Record({ timer, question, setQuestion, context, entries, attempts, saveAttempts, onFinish, onPractice, flash, myQuestions = [], onCarryQuestions }, ref) {
+  const [rubricOpen, setRubricOpen] = useState(false);
   const [recOn, setRecOn] = useState(!IN_ARTIFACT);
   const [recording, setRecording] = useState(false);
   const [liveText, setLiveText] = useState('');
@@ -232,7 +293,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                       <span className="link" style={{ fontSize: 12.5, color: 'var(--muted)' }} onClick={() => setGuideOpen(false)}>닫기</span>
                     </div>
                     {GUIDE.map(([h, t]) => <div key={h}><span style={{ color: 'var(--muted)' }}>{h} · </span>{t}</div>)}
-                    {!TOUCH && !MAC && <a href={HOMEPAGE_URL} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', fontWeight: 600 }}>녹음되는 홈페이지 열기 ↗</a>}
+                    {!TOUCH && !MAC && <a href={carryLink(myQuestions, question)} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', fontWeight: 600 }}>녹음되는 홈페이지 열기 ↗</a>}
                   </div>
                 )}
               </div>
@@ -241,7 +302,10 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
             <textarea ref={answerRef} className="transcript" rows={9} value={liveText} onChange={ev => {
                 // Text copied from the homepage carries the question too: fill both fields.
                 const m = ev.target.value.match(HANDOFF);
-                if (m) { setQuestion(m[1].trim()); setLiveText(m[2].trim()); } else setLiveText(ev.target.value);
+                if (m) {
+                  setQuestion(m[1].trim()); setLiveText(m[2].trim());
+                  if (m[3] && onCarryQuestions) onCarryQuestions(m[3].split('\n').map(l => l.replace(/^-\s*/, '')));
+                } else setLiveText(ev.target.value);
               }}
               placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : (IN_ARTIFACT ? '답변을 말하거나 적은 뒤 ‘피드백 받기’를 누르세요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.') + DICTATION_TIP} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -250,30 +314,55 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                 {audioUrl && <audio src={audioUrl} controls style={{ height: 34 }} />}
                 {!IN_ARTIFACT && liveText.trim() && (
                   <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '8px 14px', textDecoration: 'none' }}
-                    onClick={() => { const t = `[질문] ${question || '(질문 없음)'}\n[답변] ${liveText.trim()}`; navigator.clipboard?.writeText(t).then(() => flash('복사했어요. 열린 화면의 답변 칸에 붙여 넣으세요'), () => {}); }}>복사하고 Claude 피드백 받기 ↗</a>
+                    onClick={() => { const t = `[질문] ${question || '(질문 없음)'}\n[답변] ${liveText.trim()}` + (myQuestions.length ? QLIST + myQuestions.map(x => '- ' + x.q.replace(/\s*\n\s*/g, ' ')).join('\n') : ''); navigator.clipboard?.writeText(t).then(() => flash('복사했어요. 열린 화면의 답변 칸에 붙여 넣으세요'), () => {}); }}>복사하고 Claude 피드백 받기 ↗</a>
                 )}
                 <button onClick={onFeedback} style={{ fontSize: 13, padding: '8px 14px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{fbLoading ? '평가 중…' : (fb ? '다시 평가' : '피드백 받기')}</button>
               </div>
             </div>
           </div>
           <div className="fb-panel">
-            {!fb && <div style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--muted-3)' }}>답변이 끝나면 논리성·근거·구조·전달력·쟁점 이해를 점수로 평가하고, 잘한 점과 고칠 점을 정리합니다.</div>}
+            {!fb && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--muted-3)' }}>답변이 끝나면 로스쿨 구술면접 평가 기준표(6개 항목 · 100점)로 채점하고, 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 보여 줍니다.</div>
+                <span className="link" style={{ fontSize: 12.5, color: 'var(--muted-3)', alignSelf: 'flex-start' }} onClick={() => setRubricOpen(!rubricOpen)}>{rubricOpen ? '평가 기준 닫기' : '평가 기준 보기'}</span>
+                {rubricOpen && <RubricTable />}
+              </div>
+            )}
             {fb && (
               <>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--sans)', fontWeight: 200, fontSize: 64, lineHeight: 1, letterSpacing: '-0.04em' }}>{fb.total}</span>
                   <span style={{ ...darkLabel, fontSize: 12 }}>/ 100</span>
+                  <span style={{ fontSize: 13, color: '#e9e6dd' }}>{fb.grade || gradeOf(fb.total)}</span>
+                  <span className="link" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted-3)' }} onClick={() => setRubricOpen(!rubricOpen)}>{rubricOpen ? '평가 기준 닫기' : '평가 기준 보기'}</span>
                 </div>
+                {rubricOpen && <RubricTable />}
                 <div style={{ fontSize: 14.5, lineHeight: 1.75 }}>{fb.summary}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8 }}>
                   {Object.entries(fb.scores || {}).map(([k, v]) => (
                     <div key={k} className="fb-score">
                       <span style={{ fontSize: 11, color: 'var(--muted-3)' }}>{k}</span>
-                      <span style={{ fontSize: 20, fontWeight: 300 }}>{v}</span>
-                      <div style={{ height: 2, background: 'var(--charcoal-line)' }}><div style={{ height: 2, width: Math.round(v / 20 * 100) + '%', background: ACCENT }} /></div>
+                      <span style={{ fontSize: 20, fontWeight: 300 }}>{v}<small style={{ fontSize: 11, color: 'var(--muted-3)' }}> / {(fb.max && fb.max[k]) || 20}</small></span>
+                      <div style={{ height: 2, background: 'var(--charcoal-line)' }}><div style={{ height: 2, width: Math.round(v / ((fb.max && fb.max[k]) || 20) * 100) + '%', background: ACCENT }} /></div>
                     </div>
                   ))}
                 </div>
+                {(fb.criteria || []).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={darkLabel}>항목별 채점 근거</div>
+                    {fb.criteria.map(c => (
+                      <div key={c.name} className="fb-crit">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+                          <span style={{ fontWeight: 600 }}>{c.name}{c.level ? ` · ${c.level}` : ''}</span>
+                          <span className="mono" style={{ color: 'var(--muted-3)' }}>{c.score}/{c.max}</span>
+                        </div>
+                        {c.evidence && <div style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--muted-3)' }}>“{c.evidence}”</div>}
+                        {c.reason && <div style={{ fontSize: 13.5, lineHeight: 1.7 }}>{c.reason}</div>}
+                      </div>
+                    ))}
+                    {(fb.deductions || []).map((d, i) => <div key={i} style={{ fontSize: 13.5, color: '#e8a29a' }}>감점 −{d.points} · {d.reason}</div>)}
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={darkLabel}>잘한 점</div>{(fb.strengths || []).map((x, i) => <div key={i} style={{ fontSize: 14, lineHeight: 1.7 }}>+ {x}</div>)}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={darkLabel}>고칠 점</div>{(fb.weaknesses || []).map((x, i) => <div key={i} style={{ fontSize: 14, lineHeight: 1.7 }}>− {x}</div>)}</div>
                 {fb.better && (
@@ -310,6 +399,23 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     </section>
   );
 });
+
+// The rubric as the candidate sees it: weight, what is judged, and what the top and middle levels look like.
+function RubricTable() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(255,255,255,0.04)', padding: 14 }}>
+      {RUBRIC.map(r => (
+        <div key={r.k} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, lineHeight: 1.65 }}>
+          <span style={{ fontWeight: 600 }}>{r.k} · {r.max}점</span>
+          <span style={{ color: 'var(--muted-3)' }}>{r.what}</span>
+          <span>상 · {r.levels[0]}</span>
+          <span style={{ color: 'var(--muted-3)' }}>중 · {r.levels[2]}</span>
+        </div>
+      ))}
+      <div style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--muted-3)' }}>{GRADES.map(([min, l]) => `${min ? min + '점 이상' : '그 아래'} ${l}`).join(' · ')}</div>
+    </div>
+  );
+}
 
 export function RecordBlock({ title, boxed, serif, children }) {
   return (
@@ -435,7 +541,7 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
                     <>
                       <RecordBlock title={`피드백 · ${a.fb.total}점`}>
                         {a.fb.summary}
-                        <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{Object.entries(a.fb.scores || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{Object.entries(a.fb.scores || {}).map(([k, v]) => `${k} ${v}/${(a.fb.max && a.fb.max[k]) || 20}`).join(' · ')}</div>
                         {(a.fb.strengths || []).map((x, i) => <div key={'s' + i}>+ {x}</div>)}
                         {(a.fb.weaknesses || []).map((x, i) => <div key={'w' + i}>− {x}</div>)}
                       </RecordBlock>

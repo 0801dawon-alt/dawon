@@ -27,7 +27,7 @@ function AttemptDetail({ a }) {
         <>
           <RecordBlock title="피드백">
             {a.fb.summary}
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{Object.entries(a.fb.scores || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{Object.entries(a.fb.scores || {}).map(([k, v]) => `${k} ${v}/${(a.fb.max && a.fb.max[k]) || 20}`).join(' · ')}</div>
             {(a.fb.strengths || []).map((x, i) => <div key={'s' + i}>+ {x}</div>)}
             {(a.fb.weaknesses || []).map((x, i) => <div key={'w' + i}>− {x}</div>)}
           </RecordBlock>

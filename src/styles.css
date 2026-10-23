@@ -180,6 +180,7 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .transcript { font: inherit; font-size: 15px; line-height: 1.85; padding: 16px; background: var(--paper); border: 1px solid var(--line); outline: none; resize: vertical; color: var(--ink); }
 .fb-panel { background: var(--charcoal-deep); color: var(--cream); padding: clamp(20px, 3vw, 32px); display: flex; flex-direction: column; gap: 18px; min-height: 280px; }
 .fb-score { border: 1px solid var(--charcoal-line); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.fb-crit { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--charcoal-line); }
 .fu-item { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid #3d3b39; }
 .btn-answer { font-size: 12px; padding: 6px 10px; background: transparent; color: var(--cream); border: 1px solid var(--muted); }
 .btn-answer:hover { border-color: var(--cream); }
