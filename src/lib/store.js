@@ -14,7 +14,8 @@ const SEEN_KEY = 'thoughtlib_seed_seen_v1';
 // Subtopics added over time, one file per batch (topics-add-YYYYMMDD.js); each carries its own motion and reasons.
 const ADDED = Object.values(import.meta.glob('../data/topics-add-*.js', { eager: true })).flatMap(m => m.default || []);
 
-const seed = () => [...TOPICS, ...NOTION_A, ...NOTION_B, ...NOTION_C, ...ADDED].map(t => ({ ...t, myView: '' }));
+export const SEED_TOPICS = [...TOPICS, ...NOTION_A, ...NOTION_B, ...NOTION_C, ...ADDED];
+const seed = () => SEED_TOPICS.map(t => ({ ...t, myView: '' }));
 
 // Fields that come from the library data; the viewer's own notes, scraps and model answers stay theirs.
 const SEED_FIELDS = ['title', 'category', 'summary', 'keywords', 'tags', 'background', 'issues', 'pro', 'con', 'motion', 'questions'];
