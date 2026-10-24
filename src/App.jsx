@@ -172,6 +172,9 @@ export default function App() {
     const added = list.filter(a => !before.has(a.id)).length;
     const updated = list.filter(a => before.has(a.id) && a.fb && !before.get(a.id).fb).length;
     if (list.length) saveAttempts(prev => mergeAttemptLists(prev, list));
+    // Model answers written on the other side; answers already here are kept.
+    const models = payload.models || {};
+    if (Object.keys(models).length) save(prev => prev.map(e => (models[e.id] ? { ...e, models: { ...models[e.id], ...(e.models || {}) } } : e)));
     return { added, updated, questions: mergeMyQuestions(payload.mq || []) };
   };
   // This side's records as one token, for the homepage link and the copy-back text.
@@ -179,9 +182,10 @@ export default function App() {
   useEffect(() => {
     let on = true;
     const attemptsOut = attempts.slice(0, 80).map(a => (a.context && a.context.length > 1500 ? { ...a, context: a.context.slice(0, 1500) } : a));
-    encodeSync({ attempts: attemptsOut, mq: myQuestions.map(x => x.q) }).then(t => { if (on) setSyncToken(t); }, () => {});
+    const models = Object.fromEntries(entries.filter(e => e.models && Object.keys(e.models).length).map(e => [e.id, e.models]));
+    encodeSync({ attempts: attemptsOut, mq: myQuestions.map(x => x.q), models }).then(t => { if (on) setSyncToken(t); }, () => {});
     return () => { on = false; };
-  }, [attempts, myQuestions]);
+  }, [attempts, myQuestions, entries]);
   // The claude.ai page opens the homepage with #carry=<records>&q=<current question>.
   useEffect(() => {
     const m = location.hash.match(/^#carry=([^&]+)(?:&q=(.*))?$/);

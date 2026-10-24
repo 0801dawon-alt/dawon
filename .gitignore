@@ -1,2 +1,5 @@
 node_modules
 dist
+
+# Private Notion study notes: built into the claude.ai page only, never pushed.
+src/data/notion-notes.json

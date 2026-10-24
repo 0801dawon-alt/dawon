@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NEUTRAL, tagLinks } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
 import CASES from '../data/cases.js';
 import TAGFIX from '../data/tagfix.js';
 import PROCON from '../data/procon.js';
-import { ask, lastAiIssue } from '../lib/ai.js';
+import { ask, hasApiKey, inArtifact, lastAiIssue } from '../lib/ai.js';
 import { LAW_GUIDE } from '../lib/constants.js';
 import { ctx } from '../lib/util.js';
 
@@ -22,6 +22,8 @@ ${ctx(entry)}`);
   return text ? text.trim() : null;
 }
 
+const NO_AI_MODEL = '이 홈페이지는 AI가 연결되어 있지 않아 모범답안을 새로 쓸 수 없어요. Claude 링크에서 이 질문의 ‘→ 모범답안’을 한 번 열어 두면, 그다음부터 ‘녹음되는 홈페이지 열기’로 넘어올 때 여기에도 그대로 보여요.';
+
 function useModelAnswer({ entry, q, onSave }) {
   const saved = (entry.models || {})[q] || '';
   const [open, setOpen] = useState(false);
@@ -31,6 +33,8 @@ function useModelAnswer({ entry, q, onSave }) {
     if (open) { setOpen(false); return; }
     setOpen(true);
     if (saved || loading) return;
+    // The homepage has no AI of its own; answers written on the claude.ai page come over with the records.
+    if (!inArtifact() && !hasApiKey()) { setErr(NO_AI_MODEL); return; }
     setLoading(true); setErr('');
     const t = await writeModelAnswer(entry, q);
     setLoading(false);
@@ -82,6 +86,41 @@ function Scraps({ items, onChange }) {
         </div>
       ))}
       <button className="scrap-add" onClick={add}>+ 스크랩 칸 추가</button>
+    </div>
+  );
+}
+
+// The user's Notion notes, grouped by topic id. Loaded on first use to keep the main bundle small.
+let notesByTopic = null;
+// The notes file is private: it is kept out of the public repository, so the homepage build has none.
+const NOTE_FILES = import.meta.glob('../data/notion-notes.json');
+const loadNotes = () => {
+  if (notesByTopic) return Promise.resolve(notesByTopic);
+  const load = Object.values(NOTE_FILES)[0];
+  return (load ? load() : Promise.resolve({ default: [] })).then(m => {
+    notesByTopic = {};
+    (m.default || m).forEach(n => n.topics.forEach(id => { (notesByTopic[id] = notesByTopic[id] || []).push(n); }));
+    return notesByTopic;
+  }, () => (notesByTopic = {}));
+};
+
+function NotionNotes({ topicId }) {
+  const [notes, setNotes] = useState(notesByTopic ? notesByTopic[topicId] || [] : null);
+  const [open, setOpen] = useState(null);
+  useEffect(() => { let on = true; setOpen(null); loadNotes().then(m => { if (on) setNotes(m[topicId] || []); }); return () => { on = false; }; }, [topicId]);
+  if (!notes || !notes.length) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ ...sectionLabel, marginBottom: 6 }}>노션 정리 · {notes.length}</div>
+      {notes.map(n => (
+        <div key={n.id} className="note-item">
+          <button className="note-head" onClick={() => setOpen(open === n.id ? null : n.id)}>
+            <span style={{ fontWeight: 600, fontSize: 15, textAlign: 'left', wordBreak: 'keep-all' }}>{n.title}</span>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{n.page} {open === n.id ? '−' : '+'}</span>
+          </button>
+          {open === n.id && <div className="note-text">{n.text}</div>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -151,6 +190,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
               ))}
             </div>
           )}
+          <NotionNotes topicId={od.id} />
           {(pc.pro.length > 0 || pc.con.length > 0) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {pc.motion && (

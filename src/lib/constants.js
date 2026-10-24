@@ -53,9 +53,9 @@ export function tagLinks(tag){ return {tag,
   cols:COLS.map(([l,q,o])=>({label:l,url:NV(tag+' '+q,o)})),
   cases:[{label:'대법원 판례',url:NS(tag+' 대법원 판결')},{label:'헌법재판소 결정',url:NS(tag+' 헌법재판소 결정')},{label:'케이스노트',url:'https://casenote.kr/search/?q='+encodeURIComponent(tag)},{label:'판례 해설 기사',url:NV(tag+' 판결','')}]}; }
 
-export const CAT_ORDER = ['사회', '법', '정치', '경제', '과학', '환경', '문화', '국제'];
+export const CAT_ORDER = ['사회', '법', '정치', '경제', '과학', '환경', '문화', '국제', '이론'];
 // Category colors appear only in the library (cards, chips, number shapes).
-export const CAT_COLORS = { 사회: '#a0614f', 법: '#4c5870', 정치: '#7a3b3b', 경제: '#a88447', 과학: '#4f7682', 환경: '#6b7a4e', 문화: '#8d6e86', 국제: '#5a6e7a' };
+export const CAT_COLORS = { 사회: '#a0614f', 법: '#4c5870', 정치: '#7a3b3b', 경제: '#a88447', 과학: '#4f7682', 환경: '#6b7a4e', 문화: '#8d6e86', 국제: '#5a6e7a', 이론: '#6e6255' };
 export const NEUTRAL = '#8a8780';
 export const catColor = c => CAT_COLORS[c] || NEUTRAL;
 

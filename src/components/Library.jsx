@@ -31,12 +31,13 @@ function NumberShape({ entry, index }) {
 const Library = forwardRef(function Library({ entries, categories, cat, setCat, search, setSearch, page, setPage, onOpen, viewed, onNew }, ref) {
   const PER_PAGE = usePerPage();
   const q = search.trim().toLowerCase();
-  // A topic's number is its place in its own category, so search results (even under '전체') show
-  // the same number as the category list. Only the unsearched '전체' list counts straight through.
-  const inCat = entries.filter(e => cat === '전체' || e.category === cat);
+  // A search always covers every category. A topic's number is its place in its own category, so search
+  // results show the same number as the category list; only the unsearched '전체' list counts straight through.
+  const shownCat = q ? '전체' : cat;
+  const inCat = entries.filter(e => shownCat === '전체' || e.category === shownCat);
   const seen = {}, catNum = new Map(entries.map(e => [e.id, (seen[e.category] = (seen[e.category] ?? -1) + 1)]));
-  const numOf = cat === '전체' && !q ? new Map(inCat.map((e, i) => [e.id, i])) : catNum;
-  const filtered = inCat.filter(e => !q || [e.title, e.summary, ...(e.keywords || [])].join(' ').toLowerCase().includes(q));
+  const numOf = shownCat === '전체' && !q ? new Map(inCat.map((e, i) => [e.id, i])) : catNum;
+  const filtered = inCat.filter(e => !q || [e.title, e.summary, ...(e.keywords || []), ...(e.tags || [])].join(' ').toLowerCase().includes(q));
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const cur = Math.min(page, pages - 1);
   const start = cur * PER_PAGE;
@@ -60,9 +61,9 @@ const Library = forwardRef(function Library({ entries, categories, cat, setCat, 
         </div>
         <div className="chip-row">
           {['전체', ...categories].map(c => {
-            const on = c === cat, colored = on && c !== '전체';
+            const on = c === shownCat, colored = on && c !== '전체';
             return (
-              <button key={c} className="chip" onClick={() => setCat(c)}
+              <button key={c} className="chip" onClick={() => { if (q) setSearch(''); setCat(c); }}
                 style={on ? { background: colored ? catColor(c) : '#151515', color: colored ? '#fff' : '#f3f1e8' } : undefined}>{c}</button>
             );
           })}
