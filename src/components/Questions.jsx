@@ -1,6 +1,7 @@
 import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES, Q_TYPES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
+import { bankQuestions } from '../lib/bank.js';
 import { ctx, pad, parseJSON, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
@@ -12,21 +13,15 @@ const TYPE_GUIDE = {
 };
 const COUNTS = [[1, '1개'], [2, '2개'], [3, '3개'], [5, '5개']];
 
-async function generate(e, qType, qStyle, qCount) {
+async function generate(e, qType, qStyle, qCount, shown) {
   const QS = Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0];
   const avoid = (e.questions || []).map((q, i) => (i + 1) + '. ' + q).join('\n');
   const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n[질문 방향] ${QS.k}: ${QS.g}\n아래 주제로 ${TYPE_GUIDE[qType]} ${qCount}개를 만들어라.\n[필수 조건]\n- 실제 면접에 출제될 가능성이 높은, 찬반이 명확히 대립하거나 구체적 의견 제시를 요구하는 질문일 것.\n- 단순 지식 확인, 막연한 '어떻게 생각하나요?' 식 질문 금지. 구체적 정책·제도·사례·수치·판례 등 맥락을 1문장 제시한 뒤 질문할 것(전체 2~3문장 허용).\n- 맥락이 실제 정책·법안·판결·사건·통계라면 실제로 존재하거나 논의·보도된 것만 쓰고, 가능하면 연도나 주체를 밝힐 것. 특정 기관이 실제로 하지 않은 일을 했다고 쓰지 말 것.\n- 사례를 만들어 써도 되며 가상이라고 밝힐 필요는 없지만, 한국의 현실과 맞아떨어져야 한다(실제로 있을 법한 상황·수치·제도 범위). '가령', '예를 들어'로 시작하는 가정 서술은 꼭 필요할 때만 쓴다.\n- 현실에 맞는 맥락이 마땅치 않으면 사례를 길게 풀지 말고, 대립 지점이 분명한 질문을 짧고 명료하게 던질 것.\n- 질문은 반드시 '~입니까?', '~하겠습니까?', '~생각합니까?' 등 '까?'로 끝나거나 '~답변해보시오.', '~제시해보시오.'로 끝낼 것.\n- 아래 기존 예상 질문과 쟁점·표현이 겹치지 않을 것:\n${avoid || '(없음)'}\n각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`));
   const list = Array.isArray(r) ? r.filter(x => x && x.q) : null;
   if (list && list.length) return { list, ai: true };
-  markUnreadable();
-  const t = e.title, iss = e.issues || [];
-  const base = [
-    ...iss.map(x => `'${x.replace(/[?]$/, '')}'라는 쟁점에 대해 찬성과 반대 중 한쪽 입장을 택하고, 반대 측의 가장 강력한 논거를 반박해보시오.`),
-    `${t} 문제에서 어느 한쪽을 택하면 다른 쪽이 손해를 보게 되는 상황이 생깁니다. 본인은 어떤 기준으로 판단하겠습니까? 구체적 사례를 들어 답변해보시오.`,
-    `${t}에 대해 본인이 제시한 해결책이 가져올 수 있는 가장 큰 부작용은 무엇이며, 이를 어떻게 보완하겠습니까?`,
-    `${t}와 관련해 정부, 기업, 개인 중 가장 큰 책임을 져야 할 주체는 누구라고 생각합니까?`,
-  ];
-  return { list: base.slice(0, qCount).map(q => ({ q, intent: '기본 질문 · Claude 답변을 받지 못해 미리 준비된 문장을 보여드려요' })), ai: false };
+  const fromBank = await bankQuestions(e, qType, qCount, shown);
+  if (!fromBank.length) markUnreadable();
+  return { list: fromBank, ai: false };
 }
 
 function DarkChips({ options, value, onChange }) {
@@ -47,14 +42,16 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
   const [loading, setLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualText, setManualText] = useState('');
+  const [modelOpen, setModelOpen] = useState(null);
 
   const run = async () => {
     const e = entries.find(x => x.id === topicId);
     if (!e || loading) return;
     setLoading(true);
-    const { list, ai } = await generate(e, qType, qStyle, qCount);
-    setQList(list); setLoading(false);
-    if (!ai) onFallback();
+    const { list, ai } = await generate(e, qType, qStyle, qCount, qList.map(x => x.q));
+    setLoading(false);
+    if (list.length) { setQList(list); setModelOpen(null); }
+    if (!ai && !list.length) onFallback();
   };
   const addManual = () => {
     const q = manualText.trim(); if (!q) return;
@@ -124,6 +121,8 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div className="q-item-q">{x.q}</div>
                 <div className="q-item-intent">{x.intent || ''}</div>
+                {x.model && <span className="link" style={{ fontSize: 12, color: 'var(--muted-2)', alignSelf: 'flex-start' }} onClick={() => setModelOpen(modelOpen === i ? null : i)}>{modelOpen === i ? '모범답안 접기' : '→ 모범답안'}</span>}
+                {x.model && modelOpen === i && <div className="q-model">{x.model}</div>}
               </div>
               <button className="btn-practice-dark" onClick={() => onPractice(x.q)}>연습 →</button>
             </div>

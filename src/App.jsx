@@ -203,7 +203,7 @@ export default function App() {
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Say why a generator fell back to its template text.
-  const onFallback = () => flash('기본 문장으로 대신했어요 · ' + (lastAiIssue() || 'Claude 답변을 받지 못했어요. 다시 눌러 주세요.'));
+  const onFallback = () => flash('이 주제로 저장된 문제가 아직 없어요 · ' + (lastAiIssue() || 'Claude 답변을 받지 못했어요. 다시 눌러 주세요.'));
 
   // Timer tick: prep → answer (one beep) → overtime (three beeps) until the answer is ended.
   useEffect(() => {
@@ -267,7 +267,7 @@ export default function App() {
     const e = current || entries.find(x => x.id === id); if (!e) return false;
     const r = parseJSON(await ask(`다음 자료를 한국 대학/취업 면접 대비용 지식 카드로 재구성해줘. 반드시 JSON 객체만 출력:\n{"title":"주제명(짧게)","category":"${CAT_ORDER.join('|')} 중 하나","summary":"한 문장 요약","keywords":["3개"],"background":"배경 2~3문장","issues":["핵심 쟁점 3개, '-인가/-한가'로 끝낼 것"],"pro":["찬성·긍정 관점 2~3개"],"con":["반대·우려 관점 2~3개"],"questions":["예상 면접 질문 3개, '까?' 또는 '-시오.'로 끝낼 것"]}\n\n자료:\n${ctx(e)}`));
     if (!r || !r.summary) return false;
-    updateEntry(id, { title: r.title || e.title, category: r.category || e.category, summary: r.summary, keywords: r.keywords || [], background: r.background || '', issues: r.issues || [], pro: r.pro || [], con: r.con || [], questions: r.questions || [] });
+    updateEntry(id, { edited: true, title: r.title || e.title, category: r.category || e.category, summary: r.summary, keywords: r.keywords || [], background: r.background || '', issues: r.issues || [], pro: r.pro || [], con: r.con || [], questions: r.questions || [] });
     return true;
   }
 
@@ -308,7 +308,7 @@ export default function App() {
     if (!f.title.trim()) { flash('제목을 입력하세요'); return; }
     const kw = f.keywords.split(',').map(x => x.trim()).filter(Boolean);
     const patch = { title: f.title.trim(), category: f.category.trim() || '기타', summary: f.summary.trim() || f.body.replace(/\s+/g, ' ').slice(0, 120), keywords: kw, body: f.body };
-    if (f.id) updateEntry(f.id, patch); else save(prev => [{ id: uid(), myView: '', ...patch }, ...prev]);
+    if (f.id) updateEntry(f.id, { ...patch, edited: true }); else save(prev => [{ id: uid(), myView: '', ...patch }, ...prev]);
     setForm(null); flash('저장했습니다');
   };
 

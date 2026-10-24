@@ -5,6 +5,7 @@ import CASES from '../data/cases.js';
 import TAGFIX from '../data/tagfix.js';
 import PROCON from '../data/procon.js';
 import { ask, hasApiKey, inArtifact, lastAiIssue } from '../lib/ai.js';
+import { bankModel } from '../lib/bank.js';
 import { LAW_GUIDE } from '../lib/constants.js';
 import { ctx } from '../lib/util.js';
 
@@ -22,10 +23,11 @@ ${ctx(entry)}`);
   return text ? text.trim() : null;
 }
 
-const NO_AI_MODEL = '이 홈페이지는 AI가 연결되어 있지 않아 모범답안을 새로 쓸 수 없어요. Claude 링크에서 이 질문의 ‘→ 모범답안’을 한 번 열어 두면, 그다음부터 ‘녹음되는 홈페이지 열기’로 넘어올 때 여기에도 그대로 보여요.';
+const NO_AI_MODEL = '이 질문의 모범답안은 아직 준비 중이에요. 매일 새로 채워지고 있어요. Claude 링크에서 열면 바로 새로 써 드려요.';
 
 function useModelAnswer({ entry, q, onSave }) {
-  const saved = (entry.models || {})[q] || '';
+  const [stored, setStored] = useState('');
+  const saved = (entry.models || {})[q] || stored;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -33,6 +35,9 @@ function useModelAnswer({ entry, q, onSave }) {
     if (open) { setOpen(false); return; }
     setOpen(true);
     if (saved || loading) return;
+    // Answers written ahead of time come first, so this works without AI.
+    const pre = await bankModel(q);
+    if (pre) { setStored(pre); return; }
     // The homepage has no AI of its own; answers written on the claude.ai page come over with the records.
     if (!inArtifact() && !hasApiKey()) { setErr(NO_AI_MODEL); return; }
     setLoading(true); setErr('');
@@ -104,25 +109,32 @@ const loadNotes = () => {
   }, () => (notesByTopic = {}));
 };
 
-function NotionNotes({ topicId }) {
-  const [notes, setNotes] = useState(notesByTopic ? notesByTopic[topicId] || [] : null);
+function useNotes(topicId) {
+  const [notes, setNotes] = useState(notesByTopic ? notesByTopic[topicId] || [] : []);
+  useEffect(() => { let on = true; loadNotes().then(m => { if (on) setNotes(m[topicId] || []); }); return () => { on = false; }; }, [topicId]);
+  return notes;
+}
+
+// Notes that are mostly questions belong with the expected questions; the rest read as background.
+const Q_PAGES = ['예상문제', '기출 모음', '성균관대 면접', '서울대 면접'];
+const isQuestionNote = n => {
+  if (Q_PAGES.includes(n.page)) return true;
+  const lines = n.text.split('\n').map(x => x.trim()).filter(Boolean);
+  return lines.length > 0 && lines.filter(x => /[?？]$|까\.?$|^Q\d/.test(x)).length / lines.length >= 0.5;
+};
+
+function NoteList({ notes, topicId }) {
   const [open, setOpen] = useState(null);
-  useEffect(() => { let on = true; setOpen(null); loadNotes().then(m => { if (on) setNotes(m[topicId] || []); }); return () => { on = false; }; }, [topicId]);
-  if (!notes || !notes.length) return null;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ ...sectionLabel, marginBottom: 6 }}>노션 정리 · {notes.length}</div>
-      {notes.map(n => (
-        <div key={n.id} className="note-item">
-          <button className="note-head" onClick={() => setOpen(open === n.id ? null : n.id)}>
-            <span style={{ fontWeight: 600, fontSize: 15, textAlign: 'left', wordBreak: 'keep-all' }}>{n.title}</span>
-            <span style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{n.page} {open === n.id ? '−' : '+'}</span>
-          </button>
-          {open === n.id && <div className="note-text">{n.text}</div>}
-        </div>
-      ))}
+  useEffect(() => setOpen(null), [topicId]);
+  return notes.map(n => (
+    <div key={n.id} className="note-item">
+      <button className="note-head" onClick={() => setOpen(open === n.id ? null : n.id)}>
+        <span style={{ fontWeight: 600, fontSize: 15, textAlign: 'left', wordBreak: 'keep-all' }}>{n.title}</span>
+        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{open === n.id ? '−' : '+'}</span>
+      </button>
+      {open === n.id && <div className="note-text">{n.text}</div>}
     </div>
-  );
+  ));
 }
 
 // One reason per row; wrapped lines start under the text, not under the check mark.
@@ -145,10 +157,12 @@ export function ConfirmLink({ label, armedLabel, onConfirm, style }) {
 export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onSaveModel, onMyView, onScraps, onToQuestions, onToPassage }) {
   // Case links only where real rulings exist: 대법원 (S) and/or 헌법재판소 (C).
   const fix = PROCON[od.id];
-  const pc = { motion: fix ? fix.motion : '', pro: fix ? fix.pro : (od.pro || []), con: fix ? fix.con : (od.con || []) };
+  const pc = { motion: fix ? fix.motion : (od.motion || ''), pro: fix ? fix.pro : (od.pro || []), con: fix ? fix.con : (od.con || []) };
   const courts = CASES[od.id] || '';
   const keepCase = c => (c.label === '대법원 판례' ? courts.includes('S') : c.label === '헌법재판소 결정' ? courts.includes('C') : !!courts);
   const tags = (TAGFIX[od.id] || od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
+  const notes = useNotes(od.id);
+  const askNotes = notes.filter(isQuestionNote), readNotes = notes.filter(n => !isQuestionNote(n));
   return (
     <div className="overlay" style={{ zIndex: 50, justifyContent: 'flex-end' }}>
       <div className="overlay-dim" onClick={onClose} />
@@ -173,10 +187,11 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
               {(od.keywords || []).map(k => <span key={k} className="pill">{k}</span>)}
             </div>
           </div>
-          {od.background && (
+          {(od.background || readNotes.length > 0) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={sectionLabel}>배경</div>
-              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.85, textWrap: 'pretty' }}>{od.background}</p>
+              {od.background && <p style={{ margin: 0, fontSize: 15, lineHeight: 1.85, textWrap: 'pretty' }}>{od.background}</p>}
+              {readNotes.length > 0 && <div style={{ display: 'flex', flexDirection: 'column' }}><NoteList notes={readNotes} topicId={od.id} /></div>}
             </div>
           )}
           {(od.issues || []).length > 0 && (
@@ -190,7 +205,6 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
               ))}
             </div>
           )}
-          <NotionNotes topicId={od.id} />
           {(pc.pro.length > 0 || pc.con.length > 0) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {pc.motion && (
@@ -211,10 +225,11 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
               </div>
             </div>
           )}
-          {(od.questions || []).length > 0 && (
+          {((od.questions || []).length > 0 || askNotes.length > 0) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ ...sectionLabel, marginBottom: 6 }}>예상 질문</div>
-              {od.questions.map((q, i) => <QuestionRow key={od.id + i} entry={od} q={q} onPractice={onPractice} onSaveModel={onSaveModel} />)}
+              {(od.questions || []).map((q, i) => <QuestionRow key={od.id + i} entry={od} q={q} onPractice={onPractice} onSaveModel={onSaveModel} />)}
+              {askNotes.length > 0 && <NoteList notes={askNotes} topicId={od.id} />}
             </div>
           )}
           {tags.length > 0 && (

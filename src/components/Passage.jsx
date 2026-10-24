@@ -1,6 +1,7 @@
 import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
+import { bankPassage } from '../lib/bank.js';
 import { pad, parseJSON } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
@@ -54,24 +55,7 @@ ${EXAM_LEVEL}
 ${ctxs || '(없음)'}
 JSON 객체만 출력: {"title":"제시문 세트 제목","passages":[{"label":"가","source":"제시문 성격과 출처 형식(예: 롤스, 『정의론』 재구성 / 가상 사례 / A국 법률)","text":"본문(조문·논거 목록은 줄바꿈으로 구분)"}],"questions":["문항"],"followups":["추가질문"]}`));
   if (r && Array.isArray(r.passages) && r.passages.length) return { res: r, ai: true };
-  markUnreadable();
-  const pool = list.flatMap(e => [...(e.pro || []).map(x => [e, x]), ...(e.con || []).map(x => [e, x])]);
-  const passages = labels.map((label, i) => {
-    const e = list[i % Math.max(1, list.length)];
-    const bits = pool.filter((p, j) => j % n === i).map(p => p[1]);
-    return { label, source: e ? `서재 자료 재구성 · ${e.title}` : '서재 자료 재구성', text: [e && e.summary, e && e.background, ...bits].filter(Boolean).join(' ') || '관련 자료가 부족합니다. 서재에 항목을 추가해보세요.' };
-  });
-  return {
-    ai: false,
-    res: {
-      title, passages,
-      questions: [
-        `제시문 (${labels.join('), (')})의 핵심 주장을 각각 요약하고 공통점과 차이점을 비교하시오.`,
-        '제시문 중 가장 설득력 있는 입장을 하나 고르고, 나머지 제시문의 관점에서 제기될 반론을 재반박하시오.',
-        `‘${title}’과 관련된 최근 한국 사회의 사례 하나를 들어, 제시문의 관점을 적용해 해결 방안을 제시하시오.`,
-      ],
-    },
-  };
+  return { ai: false };
 }
 
 function BoxRow({ label, options, value, onChange }) {
@@ -93,6 +77,8 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState([]);
+  const [modelOpen, setModelOpen] = useState(null);
 
   const linked = linkedTopics(entries, mode, topicId, theme, custom);
   const linkedLabel = mode === '서재' ? '' : linked.list.length
@@ -103,16 +89,24 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
     if (loading) return;
     if (!linked.title) { flash('주제를 입력하세요'); return; }
     setLoading(true); setOpen(false);
-    const { res, ai } = await generate(linked, lawType, count, len);
-    setResult({ ...res, meta: `${lawType} · ${count}개 · ${len}` }); setLoading(false);
+    let { res, ai } = await generate(linked, lawType, count, len);
+    let meta = `${lawType} · ${count}개 · ${len}`;
+    if (!ai) {
+      // No Claude: serve a passage set written ahead of time for the closest topic.
+      const words = mode === '직접' ? custom.split(/[\s,·와과및]+/).filter(w => w.length >= 2) : linked.list.flatMap(e => [e.title, ...(e.keywords || [])]);
+      const b = await bankPassage({ mode, topicId, theme, words, related: linked.list.map(e => e.id) }, lawType, seen);
+      if (!b) { markUnreadable(); setLoading(false); onFallback(); return; }
+      res = b.res; setSeen(s => [...s, b.id]);
+      meta = `${b.res.lawType || lawType} · 저장된 문제${b.exact ? '' : ' · 가장 가까운 주제'}`;
+    }
+    setResult({ ...res, meta }); setLoading(false); setModelOpen(null);
     // Let the closed arch paint once so the width/radius transition runs.
     setTimeout(() => setOpen(true), 40);
-    if (!ai) onFallback();
   };
   const close = () => { setOpen(false); setTimeout(() => setResult(null), 850); };
 
   const items = result ? [
-    ...(result.questions || []).map((q, i) => ({ no: pad(i + 1), q })),
+    ...(result.questions || []).map((q, i) => ({ no: pad(i + 1), q, model: (result.models || [])[i] || '' })),
     ...(result.followups || []).map((q, i) => ({ no: '추가질문 ' + (i + 1), q })),
   ] : [];
   const showEmpty = !result || (!open && loading);
@@ -184,7 +178,11 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
                     <div key={i} className="pq">
                       <span style={{ fontFamily: 'var(--serif)', fontSize: 13, whiteSpace: 'nowrap', paddingTop: 2 }}>{x.no}</span>
                       <span style={{ fontSize: 15, lineHeight: 1.7, wordBreak: 'keep-all' }}>{x.q}</span>
-                      <button className="btn-small" onClick={() => onPractice(x.q, result.passages.map(ps => `(${ps.label}) ${ps.text}`).join('\n\n'))}>연습 →</button>
+                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                        <button className="btn-small" onClick={() => onPractice(x.q, result.passages.map(ps => `(${ps.label}) ${ps.text}`).join('\n\n'))}>연습 →</button>
+                        {x.model && <span className="link" style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }} onClick={() => setModelOpen(modelOpen === i ? null : i)}>{modelOpen === i ? '접기' : '→ 모범답안'}</span>}
+                      </span>
+                      {x.model && modelOpen === i && <div className="p-model">{x.model}</div>}
                     </div>
                   ))}
                 </div>
