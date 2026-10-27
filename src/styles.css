@@ -46,6 +46,8 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .site-nav { display: flex; gap: 28px; flex-wrap: wrap; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; }
 .site-nav span { cursor: pointer; }
 .site-nav span:hover { opacity: 0.5; }
+.site-nav .nav-chat { color: var(--accent); text-decoration: none; }
+.site-nav .nav-chat:hover { opacity: 0.5; }
 
 /* ── shared section scaffolding ── */
 .section { --rail: clamp(56px, 9vw, 120px); display: grid; grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail); padding-block: clamp(44px, 6vw, 80px); }

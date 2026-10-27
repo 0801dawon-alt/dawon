@@ -68,3 +68,6 @@ export const ACCENT2 = '#5d6b3a';
 export const BURGUNDY = '#7F4C4C';
 
 export const FILLERS = ['음', '어', '그', '약간', '이제', '뭔가', '그러니까', '사실', '좀'];
+
+// The conversation this library is built in; linked from the claude.ai page so edits can be asked for in one tap.
+export const CHAT_URL = 'https://claude.ai/code/session_014Z7J9UNLzGHZxQRwttTMC5';

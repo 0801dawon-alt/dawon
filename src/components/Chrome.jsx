@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ACCENT, BURGUNDY } from '../lib/constants.js';
+import { ACCENT, BURGUNDY, CHAT_URL } from '../lib/constants.js';
+import { inArtifact } from '../lib/ai.js';
 
 // Logo 5a: line square (knowledge) overlapping a burgundy circle (thought); the overlap is olive.
 export function Logo() {
@@ -27,6 +28,7 @@ export function Header({ go }) {
         <span onClick={go.p}>Passage</span>
         <span onClick={go.t}>Timer</span>
         <span onClick={go.m}>My Page</span>
+        {inArtifact() && <a className="nav-chat" href={CHAT_URL} target="_blank" rel="noopener noreferrer">Chat ↗</a>}
       </nav>
     </header>
   );
