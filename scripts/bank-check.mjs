@@ -12,12 +12,15 @@ const T = JSON.parse(fs.readFileSync(path.join(DATA, 'topics.json'), 'utf8'));
 const mods = ['topics-notion-a.js', 'topics-notion-b.js', 'topics-notion-c.js', ...fs.readdirSync(DATA).filter(f => f.startsWith('topics-add-')).sort()];
 const all = [...T];
 for (const m of mods) all.push(...(await import(path.join(DATA, m))).default);
+const EXTRA = (await import(path.join(DATA, 'questions-extra.js'))).default;
+all.forEach(t => { if (EXTRA[t.id]) t.questions = [...(t.questions || []), ...EXTRA[t.id]]; });
 const BY = new Map(all.map(t => [t.id, t]));
 const flat = s => (s || '').replace(/\s+/g, '');
 
 const covered = new Set(); let ok = 0, bad = 0;
-globalThis.__M = (id, list) => {
-  list.forEach(([h], n) => {
+globalThis.__M = (id, list, from = 0) => {
+  list.forEach(([h], i) => {
+    const n = from + i;
     const q = ((BY.get(id) || {}).questions || [])[n];
     if (q && flat(q).startsWith(flat(h))) { ok++; covered.add(id + '#' + n); } else { bad++; console.log('MISMATCH', id, n, h); }
   });

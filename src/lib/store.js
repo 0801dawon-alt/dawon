@@ -3,6 +3,7 @@ import NOTION_A from '../data/topics-notion-a.js';
 import NOTION_B from '../data/topics-notion-b.js';
 import NOTION_C from '../data/topics-notion-c.js';
 import { loadJSON, saveJSON } from './util.js';
+import EXTRA_Q from '../data/questions-extra.js';
 
 export const ENTRIES_KEY = 'thoughtlib_entries_v2';
 export const ATTEMPTS_KEY = 'thoughtlib_attempts_v1';
@@ -14,7 +15,15 @@ const SEEN_KEY = 'thoughtlib_seed_seen_v1';
 // Subtopics added over time, one file per batch (topics-add-YYYYMMDD.js); each carries its own motion and reasons.
 const ADDED = Object.values(import.meta.glob('../data/topics-add-*.js', { eager: true })).flatMap(m => m.default || []);
 
-export const SEED_TOPICS = [...TOPICS, ...NOTION_A, ...NOTION_B, ...NOTION_C, ...ADDED];
+// Subtopics built from the owner's Notion notes appear only in the personal build.
+const NOTION = __PERSONAL__ ? [...NOTION_A, ...NOTION_B, ...NOTION_C] : [];
+// Partisan or person-centred current affairs stay in the personal build only; the shared version keeps
+// issues with a clear, lasting point of dispute.
+const PARTISAN = new Set(['v21', 'v22', 'v23', 'v24', 'v26', 'v27', 'v28', 'v29', 'v41', 'v42', 'v45', 'v46', 'v48', 'v50', 'v51', 'v53', 'v54', 'v55', 'v56', 'v58', 'v59', 'w2', 'w3', 'x3', 'u21', 'u22', 'u23']);
+// Extra questions are appended, so model answers keyed by question order stay with their questions.
+export const SEED_TOPICS = [...TOPICS, ...NOTION, ...ADDED]
+  .filter(t => __PERSONAL__ || !PARTISAN.has(t.id))
+  .map(t => (EXTRA_Q[t.id] ? { ...t, questions: [...(t.questions || []), ...EXTRA_Q[t.id]] } : t));
 const seed = () => SEED_TOPICS.map(t => ({ ...t, myView: '' }));
 
 // Fields that come from the library data; the viewer's own notes, scraps and model answers stay theirs.
