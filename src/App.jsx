@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CAT_ORDER } from './lib/constants.js';
+import { CAT_ORDER, LAW_GUIDE, QUESTION_CRAFT } from './lib/constants.js';
 import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
-import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, applyOverlays, libOverlay, loadEntries } from './lib/store.js';
+import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, SEED_IDS, applyOverlays, libOverlay, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
 import { decodeSync, encodeSync, encodeSyncPlain, mergeAttemptLists } from './lib/sync.js';
@@ -313,6 +313,23 @@ export default function App() {
     return true;
   }
 
+  // A card added with just a keyword or title: Claude writes the whole card for it.
+  async function fillEntry(e) {
+    const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 대비 자료를 만드는 사람이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n아래 주제(키워드)에 대해 면접 대비용 지식 카드를 직접 써라. 사실은 실제로 있는 제도·사건·통계만 쓴다. 반드시 JSON 객체만 출력:\n{"title":"주제명(짧게, 원래 제목을 살린다)","category":"${CAT_ORDER.join('|')} 중 하나","summary":"쟁점이 드러나는 한 문장 요약","keywords":["3~4개"],"tags":["4~5개"],"background":"배경 3~4문장","issues":["핵심 쟁점 3개, '-인가/-한가'로 끝낼 것"],"motion":"찬반 토론 논제 한 문장","pro":["찬성 논거 3개"],"con":["반대 논거 3개"],"questions":["예상 면접 질문 3개, '~입니까?' 또는 '~하시오.'로 끝낼 것"]}\n\n주제: ${e.title}\n분류: ${e.category}\n키워드: ${(e.keywords || []).join(', ')}\n메모: ${(e.body || '').slice(0, 2000)}`));
+    if (!r || !r.summary) return false;
+    updateEntry(e.id, { title: r.title || e.title, category: CAT_ORDER.includes(r.category) ? r.category : e.category, summary: r.summary, keywords: r.keywords || e.keywords || [], tags: r.tags || [], background: r.background || '', issues: r.issues || [], motion: r.motion || '', pro: r.pro || [], con: r.con || [], questions: r.questions || [] });
+    return true;
+  }
+  // Own cards still without content are filled once each when Claude is available.
+  const filling = useRef(new Set());
+  useEffect(() => {
+    if (!aiOn) return;
+    const todo = entries.filter(e => !SEED_IDS.has(e.id) && !(e.background || '').trim() && !(e.questions || []).length && !filling.current.has(e.id)).slice(0, 3);
+    if (!todo.length) return;
+    todo.forEach(e => filling.current.add(e.id));
+    (async () => { for (const e of todo) if (await fillEntry(e)) flash(`‘${e.title}’ 내용을 채웠어요`); })();
+  }, [aiOn, entries]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleFiles(files) {
     const list = [...files]; if (!list.length) return;
     setUploading(list.length);
@@ -351,7 +368,7 @@ export default function App() {
     const kw = f.keywords.split(',').map(x => x.trim()).filter(Boolean);
     const patch = { title: f.title.trim(), category: f.category.trim() || '기타', summary: f.summary.trim() || f.body.replace(/\s+/g, ' ').slice(0, 120), keywords: kw, body: f.body };
     if (f.id) updateEntry(f.id, { ...patch, edited: true }); else save(prev => [{ id: uid(), myView: '', ...patch }, ...prev]);
-    setForm(null); flash('저장했습니다');
+    setForm(null); flash(f.id || patch.summary || !hasApiKey() ? '저장했습니다' : '저장했습니다 · Claude가 내용을 채우는 중…');
   };
 
   const go = { lib: () => scroll('lib'), q: () => scroll('q'), p: () => scroll('p'), t: () => scroll('t'), m: () => scroll('m') };

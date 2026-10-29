@@ -11,6 +11,11 @@ export const ANALYSIS_KEY = 'thoughtlib_analysis_v1';
 export const MYQ_KEY = 'thoughtlib_myquestions_v1';
 export const VIEWED_KEY = 'thoughtlib_viewed_v1';
 const SEEN_KEY = 'thoughtlib_seed_seen_v1';
+const REISSUE_KEY = 'thoughtlib_reissue_20261028';
+// The 2026-10-28 daily subtopics moved from k91–k135 to k144–k182 when their ids clashed.
+const REISSUED = id => /^k(\d+)$/.test(id) && +id.slice(1) >= 144 && +id.slice(1) <= 182;
+// Ids of duplicate subtopics taken out of the library; an old copy is dropped unless the viewer edited it.
+const RETIRED = new Set(['k57', 'k75', 'k85', 'k102', 'k106']);
 
 // Subtopics added over time, one file per batch (topics-add-YYYYMMDD.js); each carries its own motion and reasons.
 const ADDED = Object.values(import.meta.glob('../data/topics-add-*.js', { eager: true })).flatMap(m => m.default || []);
@@ -42,17 +47,21 @@ export function loadEntries() {
   }
   const seen = new Set(loadJSON(SEEN_KEY, null) || saved.map(e => e.id));
   const byId = new Map(fresh.map(t => [t.id, t]));
-  const titles = new Set(saved.map(e => e.title));
+  const refreshed = saved.filter(e => !RETIRED.has(e.id) || e.edited).map(e => {
+    const f = byId.get(e.id);
+    if (!f || e.edited) return e;
+    const next = { ...e };
+    SEED_FIELDS.forEach(k => { if (f[k] !== undefined) next[k] = f[k]; });
+    return next;
+  });
+  const titles = new Set(refreshed.map(e => e.title)), ids = new Set(refreshed.map(e => e.id));
+  // Subtopics given new ids once: a library that skipped them under the old id picks them up now.
+  const reissue = !loadJSON(REISSUE_KEY, false);
   const merged = [
-    ...saved.map(e => {
-      const f = byId.get(e.id);
-      if (!f || e.edited) return e;
-      const next = { ...e };
-      SEED_FIELDS.forEach(k => { if (f[k] !== undefined) next[k] = f[k]; });
-      return next;
-    }),
-    ...fresh.filter(t => !seen.has(t.id) && !titles.has(t.title)),
+    ...refreshed,
+    ...fresh.filter(t => (!seen.has(t.id) || (reissue && REISSUED(t.id))) && !ids.has(t.id) && !titles.has(t.title)),
   ];
+  if (reissue) saveJSON(REISSUE_KEY, true);
   saveJSON(ENTRIES_KEY, merged);
   saveJSON(SEEN_KEY, fresh.map(t => t.id));
   return merged;
