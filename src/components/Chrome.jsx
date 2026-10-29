@@ -85,7 +85,9 @@ export function Footer({ onSettings, aiOn }) {
       <span>© Thought Library</span>
       <span>
         {canInstall && <><span className="link" onClick={install}>앱으로 설치 (바탕화면·홈 화면)</span> · </>}
-        항목은 이 브라우저에 저장됩니다 · <span className="link" onClick={onSettings}>{aiOn ? 'AI 연결됨' : 'AI 설정'}</span>
+        {inArtifact()
+          ? <>기록은 내 Claude 계정에 저장돼 어느 기기에서나 같아요 · <span className="link" onClick={onSettings}>설정</span></>
+          : <>기록은 이 브라우저에 저장됩니다 · <span className="link" onClick={onSettings}>기록 옮기기 · {aiOn ? 'AI 연결됨' : 'AI 설정'}</span></>}
       </span>
     </footer>
   );

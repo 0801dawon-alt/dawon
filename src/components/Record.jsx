@@ -261,7 +261,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
     if (!payload || !onImport) { flash('붙여 넣은 기록을 읽지 못했어요. 홈페이지에서 다시 복사해 주세요'); return; }
     const r = onImport(payload) || {};
     const at = (payload.attempts || []).find(a => a.id === payload.cur);
-    const parts = [r.added ? `답변 ${r.added}개` : '', r.questions ? `질문 ${r.questions}개` : ''].filter(Boolean);
+    const parts = [r.added ? `답변 ${r.added}개` : '', r.questions ? `질문 ${r.questions}개` : '', r.viewed ? `읽은 주제 ${r.viewed}개` : '', r.notes ? `나의 생각 ${r.notes}개` : ''].filter(Boolean);
     flash(parts.length ? `홈페이지 기록을 옮겼어요 · ${parts.join(', ')}` : '홈페이지 기록이 이미 모두 옮겨져 있어요');
     if (!at) return;
     setQuestion(at.q === '(질문 없음)' ? '' : at.q); setLiveText(at.text || ''); setCurAtt(at.id); setFuList([]);

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CAT_ORDER } from './lib/constants.js';
 import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
-import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, loadEntries } from './lib/store.js';
+import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, applyOverlays, libOverlay, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, uid } from './lib/util.js';
-import { decodeSync, encodeSync, mergeAttemptLists } from './lib/sync.js';
+import { decodeSync, encodeSync, encodeSyncPlain, mergeAttemptLists } from './lib/sync.js';
 import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
 import Hero from './components/Hero.jsx';
 import Library from './components/Library.jsx';
@@ -99,10 +99,26 @@ export default function App() {
 
   const flash = useCallback(t => { setToast(t); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(''), Math.max(2600, t.length * 70)); }, []);
   const scroll = key => scrollToEl(refs[key].current);
-  const save = useCallback(next => setEntries(prev => { const v = typeof next === 'function' ? next(prev) : next; saveJSON(ENTRIES_KEY, v); return v; }), []);
   // History goes to the viewer's private space on claude.ai when available, else this browser.
   const attemptsRef = useRef(attempts); attemptsRef.current = attempts;
   const remote = useRef(null);
+  const entriesRef = useRef(entries);
+  // Library changes made here also go to the viewer's Claude space, card by card, so other devices match.
+  const save = useCallback(next => {
+    const prev = entriesRef.current, v = typeof next === 'function' ? next(prev) : next;
+    entriesRef.current = v; setEntries(v); saveJSON(ENTRIES_KEY, v);
+    const r = remote.current;
+    if (!r) return;
+    const before = new Map(prev.map(e => [e.id, e])), kept = new Set(v.map(e => e.id));
+    v.forEach(e => {
+      if (before.get(e.id) === e) return;
+      const o = libOverlay(e);
+      if (o) { libSeen.current[e.id] = JSON.stringify(o); r.putLib(e.id, o); }
+    });
+    prev.forEach(e => { if (!kept.has(e.id)) { libSeen.current[e.id] = JSON.stringify({ deleted: true }); r.putLib(e.id, { deleted: true }); } });
+  }, []);
+  // Overlays already applied on this device, by card id, so a sync only touches cards that changed.
+  const libSeen = useRef({});
   const [recordsRemote, setRecordsRemote] = useState(false);
   // '나의 생각' from the private space (null = not connected, use the entry's local myView).
   const [notes, setNotes] = useState(null);
@@ -115,11 +131,19 @@ export default function App() {
   useEffect(() => {
     let live = true, conn = null;
     connectRecords({
-      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current, viewed: viewedRef.current, scraps: Object.fromEntries(entries.filter(e => (e.scraps || []).length).map(e => [e.id, e.scraps])) },
+      local: { attempts: attemptsRef.current, analysis: loadJSON(ANALYSIS_KEY, null), notes: Object.fromEntries(entries.filter(e => e.myView).map(e => [e.id, e.myView])), myQuestions: myQRef.current, viewed: viewedRef.current, scraps: Object.fromEntries(entries.filter(e => (e.scraps || []).length).map(e => [e.id, e.scraps])), lib: Object.fromEntries(entries.map(e => [e.id, libOverlay(e)]).filter(([, o]) => o)) },
       onAttempts: list => { if (!live) return; attemptsRef.current = list; setAttempts(list); },
       onAnalysis: an => { if (live) setAnalysisState(an); },
       onMyQuestions: list => { if (live) setMyQuestions(list); },
-      onViewed: ids => { if (live) setViewed(ids); },
+      onViewed: ids => { if (live) { viewedRef.current = ids; setViewed(ids); } },
+      onLibrary: lib => {
+        if (!live) return;
+        const changed = {};
+        Object.entries(lib).forEach(([id, d]) => { const j = JSON.stringify(d); if (libSeen.current[id] !== j) { libSeen.current[id] = j; changed[id] = d; } });
+        if (!Object.keys(changed).length) return;
+        const v = applyOverlays(entriesRef.current, changed);
+        entriesRef.current = v; setEntries(v); saveJSON(ENTRIES_KEY, v);
+      },
       onScraps: map => { if (live) setScraps(prev => { const next = { ...map }; Object.keys(scrapTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
       // Keep text still waiting to be written so a sync never rolls back what is being typed.
       onNotes: map => { if (live) setNotes(prev => { const next = { ...map }; Object.keys(noteTimers.current).forEach(id => { if (prev && id in prev) next[id] = prev[id]; }); return next; }); },
@@ -175,7 +199,19 @@ export default function App() {
     // Model answers written on the other side; answers already here are kept.
     const models = payload.models || {};
     if (Object.keys(models).length) save(prev => prev.map(e => (models[e.id] ? { ...e, models: { ...models[e.id], ...(e.models || {}) } } : e)));
-    return { added, updated, questions: mergeMyQuestions(payload.mq || []) };
+    // Topics opened, notes and own library cards from a device that kept them in its browser.
+    const seenNew = (payload.v || []).filter(id => !viewedRef.current.includes(id));
+    if (seenNew.length) {
+      const ids = [...viewedRef.current, ...seenNew]; viewedRef.current = ids; setViewed(ids);
+      if (remote.current) remote.current.putViewed(ids); else saveJSON(VIEWED_KEY, ids);
+    }
+    let notesAdded = 0;
+    Object.entries(payload.n || {}).forEach(([id, text]) => {
+      const cur = remote.current ? (notesRef.current || {})[id] : (entriesRef.current.find(e => e.id === id) || {}).myView;
+      if (text && !cur && entriesRef.current.some(e => e.id === id)) { onMyView(id, text); notesAdded++; }
+    });
+    if (payload.lib && Object.keys(payload.lib).length) save(prev => applyOverlays(prev, payload.lib));
+    return { added, updated, questions: mergeMyQuestions(payload.mq || []), viewed: seenNew.length, notes: notesAdded };
   };
   // This side's records as one token, for the homepage link and the copy-back text.
   const [syncToken, setSyncToken] = useState('');
@@ -200,6 +236,12 @@ export default function App() {
       if (c.q) setTQuestion(c.q);
     } catch { /* malformed link */ }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Everything this browser keeps, as text to paste into the claude.ai page once (moving a device over).
+  const deviceRecordsText = () => '[기록] ' + encodeSyncPlain({
+    attempts: attemptsRef.current.slice(0, 200), mq: myQRef.current.map(x => x.q), v: viewedRef.current,
+    n: Object.fromEntries(entriesRef.current.filter(e => e.myView).map(e => [e.id, e.myView])),
+    lib: Object.fromEntries(entriesRef.current.map(e => [e.id, libOverlay(e)]).filter(([, o]) => o)),
+  });
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Say why a generator fell back to its template text.
@@ -381,7 +423,7 @@ export default function App() {
         />
       )}
       {form && <EntryForm form={form} setForm={setForm} uploading={uploading} onClose={() => setForm(null)} onSave={saveForm} onFiles={handleFiles} />}
-      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} onSaved={msg => { setAiOn(hasApiKey()); setSettingsOpen(false); flash(msg); }} />}
+      {settingsOpen && <Settings recordsText={deviceRecordsText} onClose={() => setSettingsOpen(false)} onSaved={msg => { setAiOn(hasApiKey()); setSettingsOpen(false); flash(msg); }} />}
       {bookOpen && <QuestionBook myQuestions={myQuestions} attempts={attempts} onClose={() => setBookOpen(false)} onPractice={(q, c) => { setBookOpen(false); practice(q, c); }} />}
       <Toast text={toast} />
       {intro && <Intro onSkip={() => setIntro(false)} />}

@@ -1,6 +1,7 @@
 // Answer history (attempts + trend analysis) and '나의 생각' notes for the viewer's own
 // private space in the claude.ai artifact database: data/users/<id>/<attemptId>,
-// .../analysis, .../note-<entryId>, .../scrap-<entryId> (article clippings), .../myquestions and .../viewed.
+// .../analysis, .../note-<entryId>, .../scrap-<entryId> (article clippings), .../myquestions, .../viewed and
+// .../lib-<entryId> (the viewer's own version of a library card: added, edited, model answers saved, or deleted).
 // Resolves null outside claude.ai or when this viewer cannot have one, and the
 // app then keeps history in localStorage.
 const ANALYSIS_ID = 'analysis';
@@ -8,9 +9,10 @@ const NOTE = 'note-';
 const MYQ_ID = 'myquestions';
 const VIEWED_ID = 'viewed';
 const SCRAP = 'scrap-';
+const LIB = 'lib-';
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
-export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, onMyQuestions, onViewed, onScraps, onFail }) {
+export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, onMyQuestions, onViewed, onScraps, onLibrary, onFail }) {
   const c = window.claude;
   if (!c?.use) return null;
   const [db, user] = await Promise.all([c.use('db'), c.use('user')]);
@@ -24,7 +26,7 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
 
   let migrated = false;
   const unsubscribe = col.onSnapshot(snap => {
-    const attempts = [], notes = {}, scraps = {};
+    const attempts = [], notes = {}, scraps = {}, lib = {};
     let analysis = null, myQuestions = null, viewed = null;
     snap.docs.forEach(d => {
       if (d.id === ANALYSIS_ID) analysis = d.data();
@@ -32,6 +34,7 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
       else if (d.id === VIEWED_ID) viewed = d.data().ids || [];
       else if (d.id.startsWith(NOTE)) notes[d.id.slice(NOTE.length)] = d.data().text || '';
       else if (d.id.startsWith(SCRAP)) scraps[d.id.slice(SCRAP.length)] = d.data().items || [];
+      else if (d.id.startsWith(LIB)) lib[d.id.slice(LIB.length)] = d.data();
       else attempts.push(d.data());
     });
     // First definitive read: carry over this browser's earlier history and notes once.
@@ -51,6 +54,10 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
         if (items.length && !(id in scraps)) { guard(col.doc(SCRAP + id).set({ items })); wrote = true; }
       });
       if (!viewed && local.viewed.length) { guard(col.doc(VIEWED_ID).set({ ids: local.viewed })); wrote = true; }
+      else if (viewed && local.viewed.some(id => !viewed.includes(id))) { guard(col.doc(VIEWED_ID).set({ ids: [...new Set([...viewed, ...local.viewed])] })); wrote = true; }
+      Object.entries(local.lib).forEach(([id, data]) => {
+        if (!(id in lib)) { guard(col.doc(LIB + id).set(data)); wrote = true; }
+      });
       if (wrote) return;
     }
     onAttempts(attempts.sort(byDateDesc));
@@ -59,6 +66,7 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
     onMyQuestions(myQuestions || []);
     onViewed(viewed || []);
     onScraps(scraps);
+    onLibrary(lib);
   }, e => onFail(e));
 
   return {
@@ -69,6 +77,7 @@ export async function connectRecords({ local, onAttempts, onAnalysis, onNotes, o
     putMyQuestions: items => guard(col.doc(MYQ_ID).set({ items })),
     putViewed: ids => guard(col.doc(VIEWED_ID).set({ ids })),
     putScraps: (id, items) => guard(col.doc(SCRAP + id).set({ items })),
+    putLib: (id, data) => guard(col.doc(LIB + id).set(JSON.parse(JSON.stringify(data)))),
     unsubscribe,
   };
 }
