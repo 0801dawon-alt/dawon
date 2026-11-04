@@ -44,3 +44,8 @@ export function saveJSON(key, value) {
 export function scrollToEl(el) {
   if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY, behavior: 'smooth' });
 }
+
+// Counts one use of a feature in the homepage's visitor statistics (GoatCounter); nothing about the visitor is sent.
+export function track(name, title) {
+  try { window.goatcounter?.count?.({ path: 'event/' + name, title: title || name, event: true }); } catch { /* counter blocked */ }
+}

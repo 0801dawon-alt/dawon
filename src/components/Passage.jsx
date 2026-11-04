@@ -2,7 +2,7 @@ import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
 import { bankPassage } from '../lib/bank.js';
-import { pad, parseJSON } from '../lib/util.js';
+import { pad, parseJSON, track } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
 const LEN_GUIDE = { 짧게: '각 제시문 400자 내외', 보통: '각 제시문 650자 내외', 길게: '각 제시문 950자 내외' };
@@ -86,6 +86,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
     : '연결된 서재 주제 없음 — AI가 일반 지식으로 작성합니다';
 
   const run = async () => {
+    track('passage', '제시문 생성');
     if (loading) return;
     if (!linked.title) { flash('주제를 입력하세요'); return; }
     setLoading(true); setOpen(false);

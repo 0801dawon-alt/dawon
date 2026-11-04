@@ -2,7 +2,7 @@ import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES, Q_TYPES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
 import { bankQuestions } from '../lib/bank.js';
-import { ctx, pad, parseJSON, uid } from '../lib/util.js';
+import { ctx, pad, parseJSON, track, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
 
@@ -45,6 +45,7 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
   const [modelOpen, setModelOpen] = useState(null);
 
   const run = async () => {
+    track('questions', '예상 질문 생성');
     const e = entries.find(x => x.id === topicId);
     if (!e || loading) return;
     setLoading(true);

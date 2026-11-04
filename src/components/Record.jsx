@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import { ACCENT, CLAUDE_URL, HOMEPAGE_URL, LAW_GUIDE, QUESTION_CRAFT } from '../lib/constants.js';
 import { ask, hasApiKey, inArtifact, lastAiIssue, markUnreadable } from '../lib/ai.js';
 import { SYNC_RE, decodeSync, encodeSyncPlain } from '../lib/sync.js';
-import { countFillers, parseJSON } from '../lib/util.js';
+import { countFillers, parseJSON, track } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
 
@@ -167,6 +167,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
 
   const runFeedback = async (at, text) => {
     if (!text.trim()) { flash('전사된 답변이 없습니다'); return; }
+    track('feedback', '답변 피드백');
     setFbLoading(true);
     const entry = entries.find(e => (e.questions || []).includes(at.q));
     const fb = await evaluate(at, text, entry);
