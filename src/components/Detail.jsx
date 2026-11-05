@@ -163,6 +163,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
   const tags = (TAGFIX[od.id] || od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
   const notes = useNotes(od.id);
   const askNotes = notes.filter(isQuestionNote), readNotes = notes.filter(n => !isQuestionNote(n));
+  useEffect(() => { const k = e => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
   return (
     <div className="overlay" style={{ zIndex: 50, justifyContent: 'flex-end' }}>
       <div className="overlay-dim" onClick={onClose} />

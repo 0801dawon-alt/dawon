@@ -4,6 +4,7 @@ import { ask, hasApiKey, inArtifact, lastAiIssue, markUnreadable } from '../lib/
 import { SYNC_RE, decodeSync, encodeSyncPlain } from '../lib/sync.js';
 import { countFillers, parseJSON, track } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
+import { bankModel } from '../lib/bank.js';
 import { ConfirmLink } from './Detail.jsx';
 
 const FALLBACK_FOLLOWUPS = [
@@ -15,6 +16,14 @@ const FALLBACK_FOLLOWUPS = [
 ];
 const COUNTER = /(반면|하지만|반대로|물론)/;
 const REASON = /(예를 들어|예컨대|사례|때문|왜냐하면|그 결과)/;
+// Content words of a model answer, used to check which key points an answer covered without AI.
+const STOP = new Set('저는 제가 우리 그러나 따라서 또한 그리고 이는 이것 그것 때문 경우 생각 생각합니다 있습니다 없습니다 합니다 입니다 됩니다 있는 없는 하는 되는 것은 것이 것을 것입니다 수가 수는 수도 더욱 매우 가장 함께 다른 모든 이런 그런 첫째 둘째 셋째 넷째 다만 물론 결국 바로 위해 통해 대한 대해 있다 없다 한다 된다 하고 하며 이러한 그래서 반면 오히려 특히 실제로 정도 문제 필요 중요'.split(' '));
+const stem = w => w.replace(/(으로서|으로써|에서는|에게는|이라는|라는|에서|에게|으로|로서|로써|까지|부터|보다|처럼|마다|이나|이며|이고|하고|하며|하는|하게|해야|했다|한다|합니다|입니다|됩니다|이다|에는|과는|와는|은|는|이|가|을|를|의|에|로|과|와|도|만|며)$/, '');
+function keyPoints(model) {
+  const freq = {};
+  (model.match(/[가-힣A-Za-z]{2,}/g) || []).map(stem).filter(w => w.length >= 2 && !STOP.has(w)).forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+  return Object.entries(freq).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length).slice(0, 12).map(([w]) => w);
+}
 // Spoken Korean runs about 300 characters (spaces excluded) a minute.
 const CHARS_PER_MIN = 300;
 
@@ -95,25 +104,30 @@ JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중
     const sum = criteria.reduce((a, c) => a + c.score, 0) - deductions.reduce((a, d) => a + d.points, 0);
     fb = { ...fb, criteria, deductions, scores: Object.fromEntries(criteria.map(c => [c.name, c.score])), max, total: Math.max(0, Math.min(100, sum)) };
   } else {
-    markUnreadable();
-    // Rule-based scoring on the same rubric when Claude is unavailable.
-    const pick = (k, ratio) => Math.round(max[k] * ratio);
+    if (IN_ARTIFACT || hasApiKey()) markUnreadable();
+    // Rule-based scoring on the same rubric when Claude is unavailable: key points come from the stored model answer.
+    const model = await bankModel(at.q).catch(() => '') || '';
+    const keys = model ? keyPoints(model) : [];
+    const hit = keys.filter(k => text.includes(k)), miss = keys.filter(k => !text.includes(k));
+    const cov = keys.length ? hit.length / keys.length : 0.5;
+    const pick = (k, ratio) => Math.round(max[k] * Math.min(0.9, ratio));
     const s = {
-      '쟁점 파악': pick('쟁점 파악', 0.6),
+      '쟁점 파악': pick('쟁점 파악', 0.4 + 0.45 * cov),
       '입장 명확성': pick('입장 명확성', /(찬성|반대|생각합니다|해야 합니다|결론)/.test(text.slice(0, 120)) ? 0.75 : 0.5),
       '논증 타당성': pick('논증 타당성', /(때문|왜냐하면|따라서|그러므로)/.test(text) ? 0.6 : 0.45),
-      '근거 구체성': pick('근거 구체성', REASON.test(text) ? 0.6 : 0.4),
+      '근거 구체성': pick('근거 구체성', (REASON.test(text) ? 0.5 : 0.35) + 0.25 * cov),
       '반론·대안': pick('반론·대안', COUNTER.test(text) ? 0.6 : 0.3),
       '구조·전달': pick('구조·전달', Math.max(0.3, (/(첫째|둘째|결론적으로|정리하면)/.test(text) ? 0.7 : 0.55) - fillerN * 0.03)),
     };
     fb = {
       scores: s, max, total: Object.values(s).reduce((a, b) => a + b, 0),
-      summary: 'Claude 평가를 받지 못해 간단한 규칙 기반으로 평가했습니다. ' + lastAiIssue(),
-      strengths: [],
-      weaknesses: [...(fillerN > 3 ? ['군말이 ' + fillerN + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
+      summary: (IN_ARTIFACT || hasApiKey() ? 'Claude 평가를 받지 못해 간단한 규칙 기반으로 평가했습니다. ' + lastAiIssue() : '기본 피드백입니다. 답변의 구조와 표현을 규칙으로 점검하고, 저장된 모범답안의 핵심어와 비교했어요. 더 자세한 평가는 ‘내 Claude에서 AI 피드백’을 눌러 받으세요.') + (keys.length ? ` 모범답안 핵심어 ${keys.length}개 중 ${hit.length}개를 다뤘어요.` : ''),
+      strengths: [...(hit.length ? ['핵심어를 다룸: ' + hit.slice(0, 5).join(', ')] : []), ...(/(첫째|둘째)/.test(text) ? ['근거에 번호를 붙여 구조가 보입니다'] : [])],
+      model,
+      weaknesses: [...(fillerN > 3 ? ['군말이 ' + fillerN + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(miss.length && cov < 0.7 ? ['모범답안에 있는데 답변에 빠진 논점: ' + miss.slice(0, 5).join(', ')] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
       better: '', strengthTags: [],
       progress: hist.repeated.length ? '지난 기록에서 반복된 약점: ' + hist.repeated.join(', ') + '. 이번 답변에서도 확인해 보세요.' : '',
-      weakTags: [...(fillerN > 3 ? ['군말 과다'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
+      weakTags: [...(fillerN > 3 ? ['군말 과다'] : []), ...(keys.length && cov < 0.4 ? ['핵심 쟁점 누락'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
     };
   }
   return { ...fb, grade: gradeOf(fb.total), fillers: fl, cpm };
@@ -128,6 +142,9 @@ async function nextFollowup(at, prev) {
 
 // claude.ai pages cannot use the microphone; phones can still dictate through the keyboard.
 const IN_ARTIFACT = inArtifact();
+// The site owner's homepage keeps the copy-to-my-Claude-page flow; visitors (who cannot open that private page) get a self-contained prompt for their own Claude.
+const OWNER = !IN_ARTIFACT && (() => { try { if (/[?&]owner=1/.test(window.location.search)) localStorage.setItem('thoughtlib_owner', '1'); return localStorage.getItem('thoughtlib_owner') === '1'; } catch { return false; } })();
+const claudePrompt = (q, text, context) => `너는 한국 로스쿨 구술면접 평가위원이다. 아래 지원자 답변을 평가 기준표(6개 항목, 100점)로 채점해 줘. 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 쓰고, 잘한 점, 고칠 점(어떤 문장을 어떻게 바꿀지), 실제 면접처럼 꼬리질문 1개, 그리고 모범답안을 써 줘. 실제 지원자 평균은 60점대라고 보고 후하게 주지 마.\n\n[평가 기준표]\n${rubricText}\n\n[질문] ${q}\n${context ? '[제시문]\n' + context.slice(0, 4000) + '\n' : ''}[답변]\n${text}`;
 const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
 const DICTATION_TIP = TOUCH ? ' 키보드의 마이크 버튼을 누르고 말하면 받아 적혀요.'
@@ -192,7 +209,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
       saveAttempts(list => [at, ...list]); setCurAtt(at.id); setLiveText(text); setFuList([]);
       setUpStatus('');
       if (IN_ARTIFACT || hasApiKey()) runFeedback(at, text);
-      else flash('글로 옮겼어요. 피드백은 ‘복사하고 Claude 피드백 받기’로 받으세요');
+      else runFeedback(at, text);
     } catch (e) {
       console.warn('[Thought Library] transcription failed:', e);
       setUpStatus('');
@@ -381,18 +398,22 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                 {audioUrl && <audio src={audioUrl} controls style={{ height: 34 }} />}
                 <input ref={fileRef} type="file" accept="audio/*,video/*" style={{ display: 'none' }} onChange={ev => onUpload(ev.target.files && ev.target.files[0])} />
                 <button className="btn-line" style={{ fontSize: 13, padding: '8px 14px' }} disabled={!!upStatus} onClick={() => fileRef.current && fileRef.current.click()}>{upStatus ? '인식 중…' : '녹음·영상 파일 올리기'}</button>
-                {!IN_ARTIFACT && liveText.trim() && (
+                {OWNER && liveText.trim() && (
                   <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '8px 14px', textDecoration: 'none' }}
                     onClick={copyForClaude}>복사하고 Claude 피드백 받기 ↗</a>
                 )}
-                {(IN_ARTIFACT || hasApiKey()) && <button onClick={onFeedback} style={{ fontSize: 13, padding: '8px 14px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{fbLoading ? '평가 중…' : (fb ? '다시 평가' : '피드백 받기')}</button>}
+                {!IN_ARTIFACT && !OWNER && liveText.trim() && (
+                  <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '8px 14px', textDecoration: 'none' }}
+                    onClick={() => navigator.clipboard?.writeText(claudePrompt(question || '(질문 없음)', liveText, context)).then(() => flash('평가 요청을 복사했어요. 열린 Claude 대화창에 붙여 넣으세요'), () => flash('복사하지 못했어요. 다시 눌러 주세요'))}>내 Claude에서 AI 피드백 ↗</a>
+                )}
+                {<button onClick={onFeedback} style={{ fontSize: 13, padding: '8px 14px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{fbLoading ? '평가 중…' : (fb ? '다시 평가' : (IN_ARTIFACT || hasApiKey() ? '피드백 받기' : '기본 피드백 받기'))}</button>}
               </div>
             </div>
           </div>
           <div className="fb-panel">
             {!fb && !IN_ARTIFACT && !hasApiKey() && (
               <div style={{ fontSize: 14, lineHeight: 1.75, color: '#e9e6dd', borderBottom: '1px solid var(--charcoal-line)', paddingBottom: 14 }}>
-                이 홈페이지는 AI가 연결되어 있지 않아 피드백은 Claude에서 받아요. 답변과 전사가 끝나면 왼쪽의 ‘복사하고 Claude 피드백 받기’를 누르고, 열린 Claude 화면의 답변 칸에 붙여 넣으세요. 피드백이 바로 나오고, 여기서 한 답변 기록도 모두 Claude로 옮겨져요.
+                {OWNER ? '이 홈페이지는 AI가 연결되어 있지 않아 자세한 피드백은 Claude에서 받아요. ‘복사하고 Claude 피드백 받기’를 누르고 열린 Claude 화면의 답변 칸에 붙여 넣으세요. 여기서 한 답변 기록도 모두 Claude로 옮겨져요.' : '‘기본 피드백 받기’를 누르면 바로 채점과 모범답안 비교가 나와요. 더 깊은 AI 평가를 원하면 ‘내 Claude에서 AI 피드백’을 눌러 열린 Claude 대화창에 붙여 넣으세요(질문·답변·평가 기준이 함께 복사돼요).'}
               </div>
             )}
             {!fb && (
@@ -581,9 +602,9 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
           <div className="title-block">
             <h2 className="h2">내 기록</h2>
             <div className="accent-bar" />
-            <p className="lede" style={{ color: 'var(--muted)', fontSize: 13 }}>{savedToClaude ? '내 Claude 계정 공간에 저장돼요. 다른 기기에서 이 페이지를 열어도 그대로 보이고, 다른 사람에게는 보이지 않아요.' : IN_ARTIFACT ? '이 브라우저에만 저장돼요.' : '이 홈페이지 기록은 이 브라우저에만 있어요. ‘기록을 Claude로 옮기기’로 Claude에 합쳐 두면 어디서 열어도 같은 기록이 보여요.'}</p>
+            <p className="lede" style={{ color: 'var(--muted)', fontSize: 13 }}>{savedToClaude ? '내 Claude 계정 공간에 저장돼요. 다른 기기에서 이 페이지를 열어도 그대로 보이고, 다른 사람에게는 보이지 않아요.' : IN_ARTIFACT ? '이 브라우저에만 저장돼요.' : (OWNER ? '이 홈페이지 기록은 이 브라우저에만 있어요. ‘기록을 Claude로 옮기기’로 Claude에 합쳐 두면 어디서 열어도 같은 기록이 보여요.' : '이 홈페이지 기록은 이 브라우저에만 저장돼요. 브라우저 기록을 지우면 함께 사라지니 주의하세요.')}</p>
           </div>
-          {!IN_ARTIFACT && <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '12px 18px', textDecoration: 'none' }} onClick={sendToClaude}>기록을 Claude로 옮기기 ↗</a>}
+          {OWNER && <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '12px 18px', textDecoration: 'none' }} onClick={sendToClaude}>기록을 Claude로 옮기기 ↗</a>}
           <button onClick={analyze} style={{ fontSize: 13, padding: '12px 20px', border: 'none', background: 'var(--ink)', color: 'var(--cream)' }}>{loading ? '분석 중…' : '누적 분석하기'}</button>
         </div>
         {IN_ARTIFACT && (
@@ -657,7 +678,7 @@ JSON만 출력: {"summary":"전체 경향 2~3문장(점수 추세 포함)","patt
                   ) : (
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5, color: 'var(--muted)' }}>
                       피드백 전
-                      {(IN_ARTIFACT || hasApiKey()) && (a.text || '').trim() && <button className="btn-line" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => grade(a)}>{grading === a.id ? '평가 중…' : '피드백 받기'}</button>}
+                      {(a.text || '').trim() && <button className="btn-line" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => grade(a)}>{grading === a.id ? '평가 중…' : (IN_ARTIFACT || hasApiKey() ? '피드백 받기' : '기본 피드백 받기')}</button>}
                     </div>
                   )}
                   {(a.followups || []).length > 0 && (
