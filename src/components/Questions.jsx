@@ -25,13 +25,12 @@ async function generate(e, qType, qStyle, qCount, shown) {
   return { list: fromBank, ai: false };
 }
 
-function DarkChips({ options, value, onChange }) {
+// Option rows in the same boxed style as the passage page.
+function BoxRow({ label, options, value, onChange }) {
   return (
-    <div className="chip-row">
-      {options.map(([v, l]) => (
-        <button key={l} className="chip dark" onClick={() => onChange(v)}
-          style={v === value ? { background: 'var(--cream)', color: 'var(--ink)' } : undefined}>{l}</button>
-      ))}
+    <div className="box-row">
+      <span className="box-label">{label}</span>
+      {options.map(([v, l]) => <button key={l} className={'box' + (v === value ? ' on' : '')} onClick={() => onChange(v)}>{l}</button>)}
     </div>
   );
 }
@@ -78,35 +77,28 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
   const sub = { fontSize: 11, letterSpacing: '0.2em', color: 'var(--muted-2)' };
 
   return (
-    <section ref={ref} className="section sec-dark">
-      <Rail no="02" label="QUESTIONS" numColor="#4a4845" lineColor="#f3f1e8" />
+    <section ref={ref} className="section sec-passage sec-q">
+      <Rail no="02" label="QUESTIONS" numColor="#b5b2ac" />
       <div className="q-grid">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="title-block">
             <h2 className="h2" data-reveal="1">예상 질문 만들기.</h2>
             <div className="accent-bar" />
-            <p className="lede" style={{ color: 'var(--muted-3)' }}>지식서가의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
+            <p className="lede" style={{ color: 'var(--body)' }}>지식서가의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
           </div>
-          <div className="field-label" style={{ color: 'var(--muted-2)' }}>주제
-            <TopicPicker entries={entries} value={topicId} onChange={setTopicId} dark only={qStyle === '가치 판단형' ? valueIds : null} onlyLabel="가치 판단 질문이 준비된 주제만" />
+          <div className="field-label" style={{ color: 'var(--muted)' }}>주제
+            <TopicPicker entries={entries} value={topicId} onChange={setTopicId} only={qStyle === '가치 판단형' ? valueIds : null} onlyLabel="가치 판단 질문이 준비된 주제만" />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={sub}>질문 방향</span>
-            <DarkChips options={Q_STYLES.map(t => [t.k, t.k])} value={qStyle} onChange={setQStyle} />
-            <span style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted-3)' }}>{(Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0]).d}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <BoxRow label="질문 방향" options={Q_STYLES.map(t => [t.k, t.k])} value={qStyle} onChange={setQStyle} />
+            <span style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', paddingLeft: 68 }}>{(Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0]).d}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={sub}>유형</span>
-            <DarkChips options={Q_TYPES.map(t => [t, t])} value={qType} onChange={setQType} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={sub}>개수</span>
-            <DarkChips options={COUNTS} value={qCount} onChange={setQCount} />
-          </div>
+          <BoxRow label="유형" options={Q_TYPES.map(t => [t, t])} value={qType} onChange={setQType} />
+          <BoxRow label="개수" options={COUNTS} value={qCount} onChange={setQCount} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <button className="btn-accent" onClick={run}>{loading ? '생성 중…' : '질문 생성'} →</button>
-              <button className="btn-manual" onClick={() => setManualOpen(!manualOpen)}>질문 직접 입력</button>
+              <button className="btn-line" style={{ padding: '10px 16px', fontSize: 13 }} onClick={() => setManualOpen(!manualOpen)}>질문 직접 입력</button>
             </div>
             {manualOpen && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>

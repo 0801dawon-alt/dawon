@@ -398,11 +398,21 @@ export default function App() {
   };
 
 
+  // Desktop pages are scaled to the window height so each opens as one full screen (only long passages scroll).
+  const mainRef = useRef(null);
+  useEffect(() => {
+    const fit = () => {
+      const k = window.innerWidth > 720 ? Math.max(0.72, Math.min(1, window.innerHeight / 980)) : 1;
+      document.documentElement.style.setProperty('--fit', String(k));
+    };
+    fit(); window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
   const show = (sec, tab) => route.section === sec && (!tab || route.tab === tab);
   return (
     <div className="page routed">
       <Header section={route.section} tab={route.tab} onNav={(k, t) => nav(k, t)} onSettings={() => setSettingsOpen(true)} />
-      <main className="main">
+      <main className="main" ref={mainRef}>
       <div hidden={!show('home')}>
         <Home
           entries={entries} categories={categories} today={today}

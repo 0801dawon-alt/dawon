@@ -367,3 +367,23 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .routed .section { padding-top: clamp(24px, 3.2vw, 40px) !important; padding-bottom: clamp(28px, 3.6vw, 44px) !important; }
 .routed .title-block { gap: 8px; }
 .routed .h2 { font-size: clamp(24px, 2.4vw, 30px); }
+/* 예상 질문 in the light passage style */
+.sec-q .q-empty-arch { background: var(--paper); border: 1px solid var(--line); }
+.sec-q .q-empty { color: var(--muted); min-height: clamp(240px, 36vw, 360px); }
+.sec-q .q-item { border-bottom-color: var(--line); }
+.sec-q .q-item-intent { color: var(--muted); }
+.sec-q .btn-practice-dark { color: var(--ink); border-color: var(--ink); background: transparent; }
+.sec-q .btn-practice-dark:hover { background: var(--ink); color: var(--cream); }
+.sec-q .q-model { background: var(--paper); color: var(--ink); border-left-color: var(--brown); }
+.sec-q .manual-input { color: var(--ink); border-bottom-color: var(--ink); }
+.sec-q .manual-add { color: var(--ink); border-color: var(--ink); }
+.sec-q .q-grid { align-items: start; }
+.sec-q .box { max-width: 112px; }
+/* Passages can be read but not copied. */
+.no-copy { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* One screen per page on desktop: the content area scales with the window height (--fit, set in App). */
+@media (min-width: 721px) {
+  .routed .main { zoom: var(--fit, 1); }
+  .routed .main .section { min-height: calc((100vh - 68px - 40px) / var(--fit, 1)); }
+  .routed .site-footer { padding-block: 12px; height: 40px; align-items: center; overflow: hidden; }
+}

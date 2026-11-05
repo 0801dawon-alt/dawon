@@ -178,7 +178,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <div className="arch" style={{ width: open ? 880 : 300, minHeight: open ? 600 : 300, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
+          <div className="arch" style={{ width: open ? 880 : 260, minHeight: open ? 600 : 220, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
             {showEmpty && (
               <div className="arch-empty">
                 <div style={{ fontFamily: 'var(--serif)', fontSize: 19 }}>{loading ? '제시문을 쓰는 중…' : '아직 제시문이 없습니다'}</div>
@@ -186,7 +186,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
               </div>
             )}
             {result && !loading && (
-              <article className="arch-body" style={{ opacity: open ? 1 : 0, transform: `translateY(${open ? 0 : 16}px)` }}>
+              <article className="arch-body no-copy" onCopy={e => e.preventDefault()} onCut={e => e.preventDefault()} onContextMenu={e => e.preventDefault()} onDragStart={e => e.preventDefault()} style={{ opacity: open ? 1 : 0, transform: `translateY(${open ? 0 : 16}px)` }}>
                 <div className="arch-title">
                   <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.18em', color: 'var(--muted)' }}>제시문 면접 · {result.meta}</span>
                   <h3 style={{ margin: 0, fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(20px,2.4vw,26px)', letterSpacing: '-0.02em', wordBreak: 'keep-all' }}>{result.title}</h3>

@@ -4,6 +4,7 @@ import NOTION_B from '../data/topics-notion-b.js';
 import NOTION_C from '../data/topics-notion-c.js';
 import { loadJSON, saveJSON } from './util.js';
 import EXTRA_Q from '../data/questions-extra.js';
+import Q_CONTEXT from '../data/questions-context.js';
 
 export const ENTRIES_KEY = 'thoughtlib_entries_v2';
 export const ATTEMPTS_KEY = 'thoughtlib_attempts_v1';
@@ -15,7 +16,10 @@ const REISSUE_KEY = 'thoughtlib_reissue_20261028';
 // The 2026-10-28 daily subtopics moved from k91–k135 to k144–k182 when their ids clashed.
 const REISSUED = id => /^k(\d+)$/.test(id) && +id.slice(1) >= 144 && +id.slice(1) <= 182;
 // Ids of duplicate subtopics taken out of the library; an old copy is dropped unless the viewer edited it.
-const RETIRED = new Set(['k57', 'k75', 'k85', 'k102', 'k106']);
+// Notion pages that were study notes rather than topics (answer strategies, glossaries, the 성균관대 past-question
+// digest): they stay as reference for writing questions and passages, not as library topics.
+const NOTE_PAGES = ['n125', 'n127', 'n128', 'n129', 'n130', 'n131'];
+const RETIRED = new Set(['k57', 'k75', 'k85', 'k102', 'k106', ...NOTE_PAGES]);
 
 // Subtopics added over time, one file per batch (topics-add-YYYYMMDD.js); each carries its own motion and reasons.
 const ADDED = Object.values(import.meta.glob('../data/topics-add-*.js', { eager: true })).flatMap(m => m.default || []);
@@ -27,8 +31,15 @@ const NOTION = __PERSONAL__ ? [...NOTION_A, ...NOTION_B, ...NOTION_C] : [];
 const PARTISAN = new Set(['v21', 'v22', 'v23', 'v24', 'v26', 'v27', 'v28', 'v29', 'v41', 'v42', 'v45', 'v46', 'v48', 'v50', 'v51', 'v53', 'v54', 'v55', 'v56', 'v58', 'v59', 'w2', 'w3', 'x3', 'u21', 'u22', 'u23', 'k56', 'k59']);
 // Extra questions are appended, so model answers keyed by question order stay with their questions.
 export const SEED_TOPICS = [...TOPICS, ...NOTION, ...ADDED]
-  .filter(t => __PERSONAL__ || !PARTISAN.has(t.id))
-  .map(t => (EXTRA_Q[t.id] ? { ...t, questions: [...(t.questions || []), ...EXTRA_Q[t.id]] } : t));
+  .filter(t => (__PERSONAL__ || !PARTISAN.has(t.id)) && !RETIRED.has(t.id))
+  .map(t => (EXTRA_Q[t.id] ? { ...t, questions: [...(t.questions || []), ...EXTRA_Q[t.id]] } : t))
+  // One-line questions get the background or condition that makes them answerable (questions-context.js).
+  .map(t => (Q_CONTEXT[t.id] ? { ...t, questions: (t.questions || []).map((q, i) => withContext(q, Q_CONTEXT[t.id][i])) } : t));
+function withContext(q, c) {
+  if (!c) return q;
+  const { pre = '', post = '' } = typeof c === 'string' ? { pre: c } : c;
+  return [pre, q, post].filter(Boolean).join(' ');
+}
 export const SEED_IDS = new Set(SEED_TOPICS.map(t => t.id));
 const seed = () => SEED_TOPICS.map(t => ({ ...t, myView: '' }));
 
