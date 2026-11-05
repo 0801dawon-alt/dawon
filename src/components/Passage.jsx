@@ -3,7 +3,7 @@ import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_
 import { ask, markUnreadable } from '../lib/ai.js';
 import { bankPassage } from '../lib/bank.js';
 import { addToUserBank } from '../lib/userBank.js';
-import { pad, parseJSON, track } from '../lib/util.js';
+import { pad, parseJSON, track, fixQuestion } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import TopicPicker from './TopicPicker.jsx';
 
@@ -117,7 +117,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
       res = b.res; setSeen(s => [...s, b.id]);
       meta = `${b.res.lawType || lawType} · 저장된 문제${b.exact ? '' : ' · 가장 가까운 주제'}`;
     }
-    setResult({ ...res, meta }); setLoading(false); setModelOpen(null);
+    setResult({ ...res, questions: (res.questions || []).map(fixQuestion), followups: (res.followups || []).map(fixQuestion), meta }); setLoading(false); setModelOpen(null);
     // Let the closed arch paint once so the width/radius transition runs.
     setTimeout(() => setOpen(true), 40);
   };

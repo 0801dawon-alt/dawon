@@ -34,7 +34,6 @@ export default function Home({ entries, categories, today, onLibrary, onCategory
             <span className="door-num">{fmt(entries.length)}개 주제</span>
             <span className="door-btn line">둘러보기 →</span>
           </div>
-          <div className="door-glyph" aria-hidden="true">讀</div>
         </div>
         <div className="door door-speak" role="button" tabIndex={0} onClick={() => onMock('questions')} onKeyDown={e => e.key === 'Enter' && onMock('questions')}>
           <div className="door-k">02 · SPEAK</div>
@@ -49,7 +48,6 @@ export default function Home({ entries, categories, today, onLibrary, onCategory
             <span className="door-num">{counts ? `질문 ${fmt(counts.q)} · 제시문 ${fmt(counts.p)}세트` : '질문 · 제시문 · 실전 연습'}</span>
             <span className="door-btn light">시작하기 →</span>
           </div>
-          <div className="door-glyph" aria-hidden="true">言</div>
         </div>
       </div>
       {today && (

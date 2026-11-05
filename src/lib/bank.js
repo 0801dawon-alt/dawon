@@ -1,6 +1,7 @@
 // Questions, passage sets and model answers written ahead of time, so every feature works without AI.
 // The files are loaded on first use to keep the main bundle small.
 import { localUserBank, sharedUserBank } from './userBank.js';
+import { fixQuestion } from './util.js';
 
 const FILES = import.meta.glob('../data/bank/*.js');
 
@@ -53,7 +54,7 @@ export async function bankQuestions(entry, type, count, shown = [], style = '') 
     .map(q => ({ q, i: '서가 예상 질문', m: b.models.get(norm(q)) || '', st: valueTopic ? VALUE : '' }));
   const score = x => (style && x.st === style ? 2 : 0) + (level(x.ty) === type ? 1 : 0);
   const ranked = [...shuffle(own), ...shuffle(base)].map((x, n) => [x, score(x), n]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(([x]) => x);
-  return ranked.slice(0, count).map(x => ({ q: x.q, intent: x.i || '', model: x.m || '' }));
+  return ranked.slice(0, count).map(x => ({ q: fixQuestion(x.q), intent: x.i || '', model: x.m || '' }));
 }
 
 // The passage set closest to what was asked: same topic or theme first, then shared keywords.

@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { ACCENT, BURGUNDY, CHAT_URL } from '../lib/constants.js';
+import { CHAT_URL } from '../lib/constants.js';
 import { inArtifact } from '../lib/ai.js';
 
-// Logo: a wine-red square with an open book line.
-export function Logo({ size = 26 }) {
+// Logo (the original mark): line square (knowledge) overlapping a burgundy circle (thought); the overlap is olive.
+const LOGO_OLIVE = '#5d6b3a', LOGO_BURGUNDY = '#7F4C4C';
+export function Logo({ size = 34 }) {
+  const k = size / 38;
   return (
-    <div className="logo-mark" style={{ width: size, height: size }} aria-hidden="true">
-      <div className="logo-mark-in" />
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }} aria-hidden="true">
+      <div style={{ position: 'absolute', right: 0, bottom: 0, width: 24 * k, height: 24 * k, borderRadius: '50%', background: LOGO_BURGUNDY }} />
+      <div style={{ position: 'absolute', left: 0, top: 0, width: 26 * k, height: 26 * k, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', left: 14 * k, top: 14 * k, width: 24 * k, height: 24 * k, borderRadius: '50%', background: LOGO_OLIVE }} />
+      </div>
+      <div style={{ position: 'absolute', left: 0, top: 0, width: 26 * k, height: 26 * k, border: '1.5px solid #231719' }} />
     </div>
   );
 }
@@ -67,13 +73,13 @@ export function Intro({ onSkip }) {
   return (
     <div className="intro" onClick={onSkip}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end' }}>
-        {pop({ width: 31, height: 31, border: '1.5px solid #c9a58f' }, 0.1)}
-        {pop({ width: 34, height: 34, borderRadius: '17px 17px 0 0', background: ACCENT }, 0.25)}
-        {pop({ width: 34, height: 34, marginLeft: -2, borderRadius: '50%', background: BURGUNDY }, 0.4)}
+        {pop({ width: 31, height: 31, border: '1.5px solid #231719' }, 0.1)}
+        {pop({ width: 34, height: 34, borderRadius: '17px 17px 0 0', background: LOGO_OLIVE }, 0.25)}
+        {pop({ width: 34, height: 34, marginLeft: -2, borderRadius: '50%', background: LOGO_BURGUNDY }, 0.4)}
       </div>
-      <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(34px,5vw,60px)', letterSpacing: '-0.02em', color: 'var(--cream)', opacity: 0, animation: 'tlUp 1s cubic-bezier(.2,.7,.2,1) .7s forwards' }}>생각서재</div>
-      <div style={{ width: 64, height: 1, background: '#9a9893', transformOrigin: 'left', transform: 'scaleX(0)', animation: 'tlLine .8s ease 1.1s forwards' }} />
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.3em', color: '#b5b2ac', opacity: 0, animation: 'tlUp .9s ease 1.2s forwards' }}>THOUGHT LIBRARY</div>
+      <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(34px,5vw,60px)', letterSpacing: '-0.02em', color: 'var(--ink)', opacity: 0, animation: 'tlUp 1s cubic-bezier(.2,.7,.2,1) .7s forwards' }}>생각서재</div>
+      <div style={{ width: 64, height: 2, background: 'var(--wine)', transformOrigin: 'left', transform: 'scaleX(0)', animation: 'tlLine .8s ease 1.1s forwards' }} />
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.3em', color: 'var(--brown)', opacity: 0, animation: 'tlUp .9s ease 1.2s forwards' }}>THOUGHT LIBRARY</div>
     </div>
   );
 }

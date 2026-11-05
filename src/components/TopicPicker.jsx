@@ -38,10 +38,10 @@ export default function TopicPicker({ entries: all, value, onChange, dark = fals
       <span style={{ fontSize: 11.5, color: dark ? 'var(--muted-3)' : '#8a8780', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         {list.length ? `${list.length}개 주제` : '검색 결과가 없어요'}
         {only && (
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-            <input type="checkbox" checked={narrow} onChange={ev => { setNarrow(ev.target.checked); if (ev.target.checked && !only.has(value)) { const f = all.find(e => only.has(e.id)); if (f) onChange(f.id); } }} />
-            {onlyLabel}
-          </label>
+          <button type="button" className={'only-toggle' + (narrow ? ' on' : '') + (dark ? ' dark' : '')} aria-pressed={narrow}
+            onClick={() => { const v = !narrow; setNarrow(v); if (v && !only.has(value)) { const f = all.find(e => only.has(e.id)); if (f) onChange(f.id); } }}>
+            <span className="only-dot" />{onlyLabel}
+          </button>
         )}
       </span>
     </div>

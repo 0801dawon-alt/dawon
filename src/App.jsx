@@ -3,7 +3,7 @@ import { CAT_ORDER, LAW_GUIDE, QUESTION_CRAFT } from './lib/constants.js';
 import { ask, hasApiKey, lastAiIssue } from './lib/ai.js';
 import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, SEED_IDS, applyOverlays, libOverlay, loadEntries } from './lib/store.js';
 import { connectRecords } from './lib/records.js';
-import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, track, uid } from './lib/util.js';
+import { ctx, fixQuestion, loadJSON, parseJSON, saveJSON, scrollToEl, track, uid } from './lib/util.js';
 import { decodeSync, encodeSync, encodeSyncPlain, mergeAttemptLists } from './lib/sync.js';
 import { Footer, Header, Intro, MockHeader, TabBar, Toast } from './components/Chrome.jsx';
 import Home from './components/Home.jsx';
@@ -293,7 +293,7 @@ export default function App() {
   const finishTimer = s => ({ ...s, phase: 'done', running: false, endsAt: 0, leftMs: 0, overtime: false, over: s.overtime ? Math.floor((Date.now() - s.endsAt) / 1000) : 0 });
   const idleTimer = s => ({ ...s, phase: 'idle', running: false, remain: s.prep || s.ans, endsAt: 0, leftMs: 0, overtime: false, over: 0 });
   const practice = (q, ctx) => {
-    setTQuestion(q); setTContext(ctx || ''); setOpenId(null);
+    setTQuestion(fixQuestion(q)); setTContext(ctx || ''); setOpenId(null);
     setTimer(idleTimer);
     scroll('t');
   };

@@ -49,3 +49,23 @@ export function scrollToEl(el) {
 export function track(name, title) {
   try { window.goatcounter?.count?.({ path: 'event/' + name, title: title || name, event: true }); } catch { /* counter blocked */ }
 }
+
+// A question that starts as an instruction ('…답변하고,') and ends as a question ('…줄이겠습니까?') reads
+// awkwardly; it is turned into one instruction: '…밝히고, …줄일지 답변해보시오.'
+const DIRECTIVE = /(답변|제시|설명|서술|논증)하고, /;
+const withL = stem => {
+  const last = stem.charCodeAt(stem.length - 1);
+  if (last < 0xac00 || last > 0xd7a3) return null;
+  const jong = (last - 0xac00) % 28;
+  if (jong === 0) return stem.slice(0, -1) + String.fromCharCode(last + 8) + '지'; // add ㄹ
+  if (jong === 8) return stem + '지';
+  return stem + '을지';
+};
+export function fixQuestion(q) {
+  if (typeof q !== 'string' || !DIRECTIVE.test(q)) return q;
+  const m = q.match(/^(.*?)(\S+?)겠습니까\?\s*$/s);
+  if (!m) return q;
+  const verb = withL(m[2]);
+  if (!verb) return q;
+  return (m[1] + verb).replace(/답변하고, /, '밝히고, ').replace(/(는|은) 어떻게 (\S+지)$/, (_, p, v) => (p === '는' ? '를' : '을') + ' 어떻게 ' + v) + ' 답변해보시오.';
+}
