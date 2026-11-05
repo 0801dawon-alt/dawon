@@ -11,7 +11,7 @@ export function Logo({ size = 26 }) {
   );
 }
 
-export const NAV = [['home', '홈'], ['library', '지식서재'], ['mock', '모의면접']];
+export const NAV = [['home', '홈'], ['library', '지식서가'], ['mock', '모의면접']];
 
 export function Header({ section, onNav, onSettings }) {
   return (

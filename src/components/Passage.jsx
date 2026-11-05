@@ -97,8 +97,8 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
 
   const linked = linkedTopics(entries, mode, topicId, theme, custom);
   const linkedLabel = mode === '서재' ? '' : linked.list.length
-    ? '연결된 서재 주제 ' + linked.list.length + '개: ' + linked.list.slice(0, 3).map(e => e.title).join(', ') + (linked.list.length > 3 ? ' 외' : '')
-    : '연결된 서재 주제 없음 — AI가 일반 지식으로 작성합니다';
+    ? '연결된 서가 주제 ' + linked.list.length + '개: ' + linked.list.slice(0, 3).map(e => e.title).join(', ') + (linked.list.length > 3 ? ' 외' : '')
+    : '연결된 서가 주제 없음 — AI가 일반 지식으로 작성합니다';
 
   const run = async () => {
     track('passage', '제시문 생성');

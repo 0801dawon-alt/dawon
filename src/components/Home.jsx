@@ -23,7 +23,7 @@ export default function Home({ entries, categories, today, onLibrary, onCategory
       <div className="doors">
         <div className="door door-read" role="button" tabIndex={0} onClick={onLibrary} onKeyDown={e => e.key === 'Enter' && onLibrary()}>
           <div className="door-k">01 · READ</div>
-          <h2>지식서재</h2>
+          <h2>지식서가</h2>
           <p>시사·가치 주제마다 배경과 쟁점, 찬반 논거, 관련 기사와 판례를 정리해 두었어요.</p>
           <div className="door-chips">
             {categories.slice(0, 9).map(c => (

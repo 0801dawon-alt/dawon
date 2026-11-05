@@ -50,7 +50,7 @@ export async function bankQuestions(entry, type, count, shown = [], style = '') 
   const valueTopic = VALUE_TOPIC(entry.id);
   const own = b.qs.filter(x => x.t === entry.id && !skip.has(norm(x.q)));
   const base = (entry.questions || []).filter(q => !skip.has(norm(q)) && !own.some(x => norm(x.q) === norm(q)))
-    .map(q => ({ q, i: '서재 예상 질문', m: b.models.get(norm(q)) || '', st: valueTopic ? VALUE : '' }));
+    .map(q => ({ q, i: '서가 예상 질문', m: b.models.get(norm(q)) || '', st: valueTopic ? VALUE : '' }));
   const score = x => (style && x.st === style ? 2 : 0) + (level(x.ty) === type ? 1 : 0);
   const ranked = [...shuffle(own), ...shuffle(base)].map((x, n) => [x, score(x), n]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(([x]) => x);
   return ranked.slice(0, count).map(x => ({ q: x.q, intent: x.i || '', model: x.m || '' }));

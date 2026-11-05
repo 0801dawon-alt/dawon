@@ -1,7 +1,7 @@
 {
   "name": "Thought Library",
   "short_name": "Thought Library",
-  "description": "Claude에 연결된 지식서재와 Claude 채팅을 여는 시작 화면",
+  "description": "Claude에 연결된 생각서재와 Claude 채팅을 여는 시작 화면",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",

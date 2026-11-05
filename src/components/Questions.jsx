@@ -85,7 +85,7 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
           <div className="title-block">
             <h2 className="h2" data-reveal="1">예상 질문 만들기.</h2>
             <div className="accent-bar" />
-            <p className="lede" style={{ color: 'var(--muted-3)' }}>서재의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
+            <p className="lede" style={{ color: 'var(--muted-3)' }}>지식서가의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
           </div>
           <div className="field-label" style={{ color: 'var(--muted-2)' }}>주제
             <TopicPicker entries={entries} value={topicId} onChange={setTopicId} dark only={qStyle === '가치 판단형' ? valueIds : null} onlyLabel="가치 판단 질문이 준비된 주제만" />

@@ -51,7 +51,7 @@ const Library = forwardRef(function Library({ entries, categories, cat, setCat, 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
         <div className="lib-head">
           <div className="title-block">
-            <h2 className="h2" data-reveal="1">지식 서재.</h2>
+            <h2 className="h2" data-reveal="1">지식서가.</h2>
             <div className="accent-bar" />
           </div>
           <div className="lib-tools">

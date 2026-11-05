@@ -1,7 +1,7 @@
 {
   "name": "생각서재 · Thought Library",
   "short_name": "생각서재",
-  "description": "로스쿨 면접 연습 · 지식 서재와 답변 녹음·피드백",
+  "description": "면접 연습 · 지식서가와 모의면접(답변 녹음·피드백)",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",
