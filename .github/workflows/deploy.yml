@@ -19,13 +19,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # The old address (0801dawon-alt/dawon) only forwards visitors to thought-library.github.io.
+      - if: github.repository == '0801dawon-alt/dawon'
+        run: mkdir -p dist && cp redirect/index.html redirect/404.html dist/
+      - if: github.repository != '0801dawon-alt/dawon'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run build
+      - if: github.repository != '0801dawon-alt/dawon'
+        run: npm ci
+      - if: github.repository != '0801dawon-alt/dawon'
+        run: npm run build
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

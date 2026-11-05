@@ -60,7 +60,7 @@ export const NEUTRAL = '#8a8780';
 export const catColor = c => CAT_COLORS[c] || NEUTRAL;
 
 // The two places this app is published.
-export const HOMEPAGE_URL = 'https://0801dawon-alt.github.io/dawon/';
+export const HOMEPAGE_URL = 'https://thought-library.github.io/';
 export const CLAUDE_URL = 'https://claude.ai/artifact/Y9WdgjDnkGwq1eqap33XgE';
 
 export const ACCENT = '#5d6b3a';
