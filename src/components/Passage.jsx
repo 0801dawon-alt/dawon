@@ -178,10 +178,10 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <div className="arch" style={{ width: open ? 880 : 240, minHeight: open ? 600 : 180, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
+          <div className="arch" style={{ width: open ? 880 : 240, minHeight: open ? 600 : 250, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
             {showEmpty && (
               <div className="arch-empty">
-                <div style={{ fontFamily: 'var(--serif)', fontSize: 19 }}>{loading ? '제시문을 쓰는 중…' : '아직 제시문이 없습니다'}</div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: 19, lineHeight: 1.45, whiteSpace: 'pre-line', textAlign: 'center' }}>{loading ? '제시문을\n쓰는 중…' : '아직 제시문이\n없습니다'}</div>
                 <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{loading ? '잠시만 기다려주세요' : '주제와 형식을 고르고\n‘제시문 생성’을 누르세요.'}</div>
               </div>
             )}

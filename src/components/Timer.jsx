@@ -78,9 +78,14 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
   const wrapRef = useRef(null), live = useRef(timer), qRef = useRef(null);
   live.current = timer;
   // The question box is one line tall and grows with the text, so it always sits on the underline.
+  // While the practice page is hidden the box has no height to measure, so it is measured again once shown.
   useEffect(() => {
     const el = qRef.current; if (!el) return;
-    el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
+    const fit = () => { if (!el.offsetParent) return; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; };
+    fit();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    if (ro) ro.observe(el.parentElement || el);
+    return () => ro && ro.disconnect();
   }, [question]);
   useEffect(() => {
     let raf = 0;
@@ -113,7 +118,7 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span className="label" style={{ color: 'var(--muted)' }}>연습할 질문</span>
-          <textarea ref={qRef} className="timer-q" rows={1} value={question} onChange={ev => setQuestion(ev.target.value)} placeholder="질문을 입력하거나, 위에서 ‘연습 →’을 누르세요." />
+          <textarea ref={qRef} className="timer-q" rows={1} value={question} onChange={ev => setQuestion(ev.target.value)} placeholder="질문을 입력하거나, 예상 질문·제시문 화면에서 ‘연습 →’을 누르세요." />
         </div>
         <div className="timer-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(28px,5vw,64px)', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
