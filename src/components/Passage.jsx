@@ -2,6 +2,7 @@ import { forwardRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
 import { bankPassage } from '../lib/bank.js';
+import { addToUserBank } from '../lib/userBank.js';
 import { pad, parseJSON, track } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 
@@ -79,6 +80,19 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState([]);
   const [modelOpen, setModelOpen] = useState(null);
+  // A passage set the viewer pastes in (e.g. a past paper) is saved to the bank.
+  const [upOpen, setUpOpen] = useState(false);
+  const [up, setUp] = useState({ title: '', text: '', qs: '' });
+  const saveUpload = () => {
+    const parts = up.text.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+    const qs = up.qs.split('\n').map(x => x.replace(/^\s*(Q?\d+[.)-]?\s*)/i, '').trim()).filter(Boolean);
+    if (!parts.length || !qs.length) { flash('제시문과 문항을 모두 적어 주세요'); return; }
+    const labels = ['가', '나', '다', '라', '마', '바'];
+    const ok = addToUserBank({ k: 'p', lt: lawType, t: mode === '서재' ? [topicId] : linked.list.map(e => e.id), th: mode === '가치' ? [theme] : [], title: up.title.trim() || linked.title || '직접 올린 제시문',
+      ps: parts.map((text, i) => ({ label: labels[i] || String(i + 1), source: '직접 올린 제시문', text: text.replace(/^\(?[가-바]\)\s*/, '') })), qs, fu: [], ms: [] });
+    flash(ok ? '문제은행에 저장했어요' : '이미 저장된 제시문이에요');
+    if (ok) { setUp({ title: '', text: '', qs: '' }); setUpOpen(false); }
+  };
 
   const linked = linkedTopics(entries, mode, topicId, theme, custom);
   const linkedLabel = mode === '서재' ? '' : linked.list.length
@@ -92,10 +106,12 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
     setLoading(true); setOpen(false);
     let { res, ai } = await generate(linked, lawType, count, len);
     let meta = `${lawType} · ${count}개 · ${len}`;
+    // A set Claude wrote joins the bank, so it can be served later without AI.
+    if (ai) addToUserBank({ k: 'p', lt: lawType, t: linked.list.map(e => e.id), th: mode === '가치' ? [theme] : [], title: res.title || linked.title, ps: res.passages || [], qs: res.questions || [], fu: res.followups || [], ms: res.models || [] });
     if (!ai) {
       // No Claude: serve a passage set written ahead of time for the closest topic.
       const words = mode === '직접' ? custom.split(/[\s,·와과및]+/).filter(w => w.length >= 2) : linked.list.flatMap(e => [e.title, ...(e.keywords || [])]);
-      const b = await bankPassage({ mode, topicId, theme, words, related: linked.list.map(e => e.id) }, lawType, seen);
+      const b = await bankPassage({ mode, topicId, theme, words, related: linked.list.map(e => e.id) }, lawType, seen, len);
       if (!b) { markUnreadable(); setLoading(false); onFallback(); return; }
       res = b.res; setSeen(s => [...s, b.id]);
       meta = `${b.res.lawType || lawType} · 저장된 문제${b.exact ? '' : ' · 가장 가까운 주제'}`;
@@ -143,7 +159,19 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
               )}
               <span style={{ fontSize: 11.5, color: '#8a8780' }}>{linkedLabel}</span>
             </div>
-            <button className="btn-accent" style={{ marginTop: -6, alignSelf: 'flex-start' }} onClick={run}>{loading ? '생성 중…' : '제시문 생성'} →</button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: -6 }}>
+              <button className="btn-accent" onClick={run}>{loading ? '생성 중…' : '제시문 생성'} →</button>
+              <button className="btn-line" style={{ padding: '10px 16px', fontSize: 13 }} onClick={() => setUpOpen(!upOpen)}>제시문 직접 올리기</button>
+            </div>
+            {upOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#efede6', padding: 14 }}>
+                <span style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>위에서 고른 출제 유형과 주제로 문제은행에 저장돼요. 제시문은 빈 줄로 나누고, 문항은 한 줄에 하나씩 적으세요.</span>
+                <input className="underline-field" value={up.title} onChange={ev => setUp({ ...up, title: ev.target.value })} placeholder="제목(선택)" />
+                <textarea className="transcript" rows={6} value={up.text} onChange={ev => setUp({ ...up, text: ev.target.value })} placeholder={'(가) 제시문 내용…\n\n(나) 제시문 내용…'} />
+                <textarea className="transcript" rows={3} value={up.qs} onChange={ev => setUp({ ...up, qs: ev.target.value })} placeholder={'Q1. 제시문 (가)와 (나)를 비교하시오.\nQ2. …'} />
+                <button className="btn-solid" style={{ alignSelf: 'flex-start', padding: '10px 18px', border: 'none' }} onClick={saveUpload}>문제은행에 저장</button>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 22, minWidth: 0 }}>
             <BoxRow label="제시문 수" options={P_COUNTS} value={count} onChange={setCount} />
