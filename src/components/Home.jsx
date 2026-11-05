@@ -18,8 +18,7 @@ export default function Home({ entries, categories, today, onLibrary, onCategory
   return (
     <section className="home">
       <div className="home-eyebrow">INTERVIEW PREP · 면접 준비</div>
-      <h1 className="home-title">면접장에서 꺼낼 생각을<br /><em>미리 쌓아 두는</em> 서재.</h1>
-      <p className="home-lede">읽으며 생각을 쌓고, 말하며 다듬으세요.</p>
+      <p className="home-lede" style={{ marginTop: 10 }}>읽으며 생각을 쌓고, 말하며 다듬으세요.</p>
       <div className="doors">
         <div className="door door-read" role="button" tabIndex={0} onClick={onLibrary} onKeyDown={e => e.key === 'Enter' && onLibrary()}>
           <div className="door-k">01 · READ</div>

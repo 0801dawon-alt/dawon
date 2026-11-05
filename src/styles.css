@@ -395,7 +395,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .routed .home { padding-top: clamp(20px, 3vh, 40px); padding-bottom: 12px; }
   .routed .home-title { margin: 10px 0 8px; }
   .routed .doors { margin-top: clamp(16px, 2.5vh, 28px); }
-  .routed .door { min-height: 0; gap: 10px; padding-block: clamp(20px, 2.6vh, 30px); }
+  .routed .door { min-height: clamp(220px, 36vh, 340px); gap: 12px; padding-block: clamp(20px, 3vh, 34px); }
+  .routed .home { min-height: calc(100vh - 68px - 40px); display: flex; flex-direction: column; justify-content: center; }
   .routed .today-bar { margin-top: 14px; padding-block: 12px; }
   .routed .passage-gap { gap: 12px !important; }
   .routed .site-footer { padding-block: 12px; height: 40px; align-items: center; overflow: hidden; }
