@@ -41,7 +41,20 @@ export const GRADES = [[90, '최상위 합격권'], [80, '합격권'], [70, '무
 export const gradeOf = t => (GRADES.find(([min]) => t >= min) || GRADES[GRADES.length - 1])[1];
 const rubricText = RUBRIC.map((r, i) => `${i + 1}. ${r.k} (${r.max}점) — ${r.what}\n` + r.levels.map((d, j) => `   ${LEVELS[j]}(${Math.round(BANDS[j][0] * r.max)}~${Math.round(BANDS[j][1] * r.max)}점): ${d}`).join('\n')).join('\n');
 
-async function evaluate(at, text, entry) {
+// What this person's earlier feedback says, so each new review builds on it.
+function historyNote(history) {
+  const done = (history || []).filter(a => a.fb && a.fb.total != null).slice(0, 12);
+  if (!done.length) return { text: '', repeated: [] };
+  const count = {};
+  done.forEach(a => (a.fb.weakTags || []).forEach(t => { count[t] = (count[t] || 0) + 1; }));
+  const repeated = Object.entries(count).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}(${n}회)`);
+  const avg = Math.round(done.reduce((n, a) => n + a.fb.total, 0) / done.length);
+  const recent = done.slice(0, 3).map(a => `- ${a.fb.total}점 · ${(a.q || '').slice(0, 40)} · 고칠 점: ${(a.fb.weaknesses || []).slice(0, 2).join(' / ')}`).join('\n');
+  return { text: `[이 지원자의 지난 기록] 최근 ${done.length}회 평균 ${avg}점. 반복된 약점: ${repeated.join(', ') || '없음'}\n${recent}`, repeated: Object.keys(count).filter(t => count[t] >= 2) };
+}
+
+async function evaluate(at, text, entry, history = []) {
+  const hist = historyNote(history);
   const fl = countFillers(text), cpm = at.dur ? Math.round(text.replace(/\s/g, '').length / (at.dur / 60)) : 0;
   const limit = at.limit || 120, target = Math.round(limit / 60 * CHARS_PER_MIN);
   const withPassage = !!at.context;
@@ -53,7 +66,7 @@ ${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[군말]
 [답변 전사]
 ${text}
 ${entry ? '[참고 쟁점] ' + (entry.issues || []).join(' / ') : ''}
-
+${hist.text ? hist.text + '\n이 기록과 비교해, 반복된 약점이 이번 답변에서 고쳐졌는지 그대로인지 progress에 구체적으로 쓰고(점수는 이번 답변만으로 매긴다), 다음 연습에서 가장 먼저 고칠 한 가지를 focus에 쓴다.\n' : ''}
 [평가 기준표 · 100점]
 ${rubricText}
 
@@ -67,7 +80,7 @@ ${withPassage ? '6. 제시문이 주어진 문항이다. 제시문의 내용과 
 
 잘한 점·고칠 점은 답변의 실제 표현을 짚어 구체적으로 쓴다. 고칠 점에는 "어떤 문장을 어떻게 바꾸면 되는지"를 담는다. 누적 비교용 짧은 라벨(예: '결론 먼저 제시', '근거와 주장 연결 약함', '반론 미고려', '군말 과다')을 strengthTags/weakTags에 넣는다.
 마지막으로 모범답안을 실제로 말하는 문장으로 쓴다. 공백 제외 약 ${target}자, 결론 → 근거 2~3개 → 가장 강한 반론과 재반박 → 마무리 구조.${withPassage ? ' 제시문을 충분히 인용·활용하라.' : ' 지어낸 통계나 수치는 쓰지 마라.'}
-JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중하|하","score":0,"evidence":"답변 인용","reason":"이 수준으로 본 이유 1~2문장"}, …6개 항목 모두 위 순서대로],"deductions":[{"reason":"…","points":0}],"summary":"교수의 총평 2~3문장","strengths":["…"],"weaknesses":["…"],"better":"보완한 답변의 뼈대(3~4문장)","model":"모범답안","strengthTags":["…"],"weakTags":["…"]}`));
+JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중하|하","score":0,"evidence":"답변 인용","reason":"이 수준으로 본 이유 1~2문장"}, …6개 항목 모두 위 순서대로],"deductions":[{"reason":"…","points":0}],"summary":"교수의 총평 2~3문장","strengths":["…"],"weaknesses":["…"],"better":"보완한 답변의 뼈대(3~4문장)","model":"모범답안","strengthTags":["…"],"weakTags":["…"]${hist.text ? ',"progress":"지난 기록 대비 변화 1~2문장","focus":"다음에 고칠 한 가지"' : ''}}`));
   const max = Object.fromEntries(RUBRIC.map(r => [r.k, r.max]));
   if (fb && Array.isArray(fb.criteria) && fb.criteria.length) {
     // Keep each score inside its criterion's range and recompute the total here.
@@ -99,6 +112,7 @@ JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중
       strengths: [],
       weaknesses: [...(fillerN > 3 ? ['군말이 ' + fillerN + '회 사용되었습니다'] : []), ...(!REASON.test(text) ? ['주장을 뒷받침하는 이유나 사례가 부족합니다'] : []), ...(!COUNTER.test(text) ? ['반대 입장을 고려하지 않았습니다'] : [])],
       better: '', strengthTags: [],
+      progress: hist.repeated.length ? '지난 기록에서 반복된 약점: ' + hist.repeated.join(', ') + '. 이번 답변에서도 확인해 보세요.' : '',
       weakTags: [...(fillerN > 3 ? ['군말 과다'] : []), ...(!REASON.test(text) ? ['근거와 주장 연결 약함'] : []), ...(!COUNTER.test(text) ? ['반론 미고려'] : [])],
     };
   }
@@ -164,13 +178,34 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
   const live = useRef({});
   live.current = { liveText, attempts, question, context, limit: timer.ans };
   const prevPhase = useRef(timer.phase);
+  // A recording or video of an answer, turned into text and reviewed like a live answer.
+  const fileRef = useRef(null);
+  const [upStatus, setUpStatus] = useState('');
+  const onUpload = async file => {
+    if (!file) return;
+    if (!/^(audio|video)\//.test(file.type) && !/\.(m4a|mp3|wav|webm|mp4|mov|ogg|aac)$/i.test(file.name)) { flash('녹음이나 영상 파일을 올려 주세요'); return; }
+    setUpStatus('준비 중…');
+    try {
+      const { text, seconds } = await (await import('../lib/transcribe.js')).transcribeFile(file, setUpStatus);
+      if (!text) { setUpStatus(''); flash('파일에서 말소리를 찾지 못했어요'); return; }
+      const at = { id: 'a' + Date.now(), date: new Date().toISOString(), q: question || '(질문 없음)', text, dur: seconds, limit: timer.ans, context: context || '', fb: null, manual: true, source: 'upload' };
+      saveAttempts(list => [at, ...list]); setCurAtt(at.id); setLiveText(text); setFuList([]);
+      setUpStatus('');
+      if (IN_ARTIFACT || hasApiKey()) runFeedback(at, text);
+      else flash('글로 옮겼어요. 피드백은 ‘복사하고 Claude 피드백 받기’로 받으세요');
+    } catch (e) {
+      console.warn('[Thought Library] transcription failed:', e);
+      setUpStatus('');
+      flash(IN_ARTIFACT ? '여기서는 파일 인식을 쓸 수 없어요. 홈페이지에서 올린 뒤 ‘복사하고 Claude 피드백 받기’를 누르세요' : '파일을 글로 옮기지 못했어요. 와이파이에 연결된 크롬에서 다시 시도해 주세요');
+    } finally { if (fileRef.current) fileRef.current.value = ''; }
+  };
 
   const runFeedback = async (at, text) => {
     if (!text.trim()) { flash('전사된 답변이 없습니다'); return; }
     track('feedback', '답변 피드백');
     setFbLoading(true);
     const entry = entries.find(e => (e.questions || []).includes(at.q));
-    const fb = await evaluate(at, text, entry);
+    const fb = await evaluate(at, text, entry, live.current.attempts.filter(a => a.id !== at.id));
     saveAttempts(list => list.map(a => (a.id === at.id ? { ...a, text, fb } : a)));
     setFbLoading(false);
   };
@@ -339,10 +374,13 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                 } else setLiveText(v);
               }}
               placeholder={recOn ? '답변 시간이 시작되면 여기에 실시간으로 받아 적힙니다. 끝난 뒤 직접 고칠 수 있어요.' : (IN_ARTIFACT ? '답변을 말하거나 적은 뒤 ‘피드백 받기’를 누르세요.' : '답변을 여기에 적고 ‘피드백 받기’를 누르세요.') + DICTATION_TIP} />
+            {upStatus && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{upStatus}</div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{cur ? `${cur.dur}초 · ${liveText.replace(/\s/g, '').length}자` + (fb && fb.cpm ? ` · 분당 ${fb.cpm}자` : '') : ''}</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {audioUrl && <audio src={audioUrl} controls style={{ height: 34 }} />}
+                <input ref={fileRef} type="file" accept="audio/*,video/*" style={{ display: 'none' }} onChange={ev => onUpload(ev.target.files && ev.target.files[0])} />
+                <button className="btn-line" style={{ fontSize: 13, padding: '8px 14px' }} disabled={!!upStatus} onClick={() => fileRef.current && fileRef.current.click()}>{upStatus ? '인식 중…' : '녹음·영상 파일 올리기'}</button>
                 {!IN_ARTIFACT && liveText.trim() && (
                   <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className="btn-line" style={{ fontSize: 13, padding: '8px 14px', textDecoration: 'none' }}
                     onClick={copyForClaude}>복사하고 Claude 피드백 받기 ↗</a>
@@ -374,6 +412,12 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                 </div>
                 {rubricOpen && <RubricTable />}
                 <div style={{ fontSize: 14.5, lineHeight: 1.75 }}>{fb.summary}</div>
+                {(fb.progress || fb.focus) && (
+                  <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#e9e6dd', borderLeft: '2px solid var(--muted-2)', paddingLeft: 12 }}>
+                    {fb.progress && <div><span style={darkLabel}>지난 기록과 비교 · </span>{fb.progress}</div>}
+                    {fb.focus && <div><span style={darkLabel}>다음에 고칠 한 가지 · </span>{fb.focus}</div>}
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8 }}>
                   {Object.entries(fb.scores || {}).map(([k, v]) => (
                     <div key={k} className="fb-score">

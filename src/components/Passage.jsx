@@ -5,6 +5,7 @@ import { bankPassage } from '../lib/bank.js';
 import { addToUserBank } from '../lib/userBank.js';
 import { pad, parseJSON, track } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
+import TopicPicker from './TopicPicker.jsx';
 
 const LEN_GUIDE = { 짧게: '각 제시문 400자 내외', 보통: '각 제시문 650자 내외', 길게: '각 제시문 950자 내외' };
 
@@ -145,9 +146,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, marginTop: -6 }}>
               <BoxRow label="주제" options={P_MODES} value={mode} onChange={setMode} />
               {mode === '서재' && (
-                <select className="underline-field" value={topicId} onChange={ev => setTopicId(ev.target.value)}>
-                  {entries.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
-                </select>
+                <TopicPicker entries={entries} value={topicId} onChange={setTopicId} />
               )}
               {mode === '가치' && (
                 <select className="underline-field" value={theme} onChange={ev => setTheme(ev.target.value)}>

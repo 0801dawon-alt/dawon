@@ -6,6 +6,7 @@ import { addToUserBank } from '../lib/userBank.js';
 import { ctx, pad, parseJSON, track, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
+import TopicPicker from './TopicPicker.jsx';
 
 const TYPE_GUIDE = {
   기본: '찬반이 갈리는 지점을 짚어 지원자의 입장과 근거를 요구하는 질문',
@@ -80,11 +81,9 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
             <div className="accent-bar" />
             <p className="lede" style={{ color: 'var(--muted-3)' }}>서재의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
           </div>
-          <label className="field-label" style={{ color: 'var(--muted-2)' }}>주제
-            <select className="select-dark" value={topicId} onChange={ev => setTopicId(ev.target.value)}>
-              {entries.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
-            </select>
-          </label>
+          <div className="field-label" style={{ color: 'var(--muted-2)' }}>주제
+            <TopicPicker entries={entries} value={topicId} onChange={setTopicId} dark />
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span style={sub}>질문 방향</span>
             <DarkChips options={Q_STYLES.map(t => [t.k, t.k])} value={qStyle} onChange={setQStyle} />
