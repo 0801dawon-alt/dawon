@@ -132,7 +132,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
   return (
     <section ref={ref} className="section sec-passage">
       <Rail no="03" label="PASSAGE" numColor="#b5b2ac" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 40, minWidth: 0 }}>
+      <div className="passage-gap" style={{ display: 'flex', flexDirection: 'column', gap: 40, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div className="title-block" style={{ maxWidth: 440 }}>
             <h2 className="h2" data-reveal="1">제시문 만들기.</h2>
@@ -178,7 +178,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <div className="arch" style={{ width: open ? 880 : 260, minHeight: open ? 600 : 220, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
+          <div className="arch" style={{ width: open ? 880 : 240, minHeight: open ? 600 : 180, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.28)' : 'none' }}>
             {showEmpty && (
               <div className="arch-empty">
                 <div style={{ fontFamily: 'var(--serif)', fontSize: 19 }}>{loading ? '제시문을 쓰는 중…' : '아직 제시문이 없습니다'}</div>

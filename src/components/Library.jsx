@@ -48,7 +48,7 @@ const Library = forwardRef(function Library({ entries, categories, cat, setCat, 
   return (
     <section ref={ref} className="section">
       <Rail no="01" label="LIBRARY" numColor="#c9c6bf" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
+      <div className="lib-gap" style={{ display: 'flex', flexDirection: 'column', gap: 32, minWidth: 0 }}>
         <div className="lib-head">
           <div className="title-block">
             <h2 className="h2" data-reveal="1">지식서가.</h2>
