@@ -29,7 +29,7 @@ export function MiniTimer({ timer, timerRef, onClick }) {
   const t = timeLabel(timer);
   // The browser tab shows the time too (on the homepage), for when another tab is in front.
   useEffect(() => {
-    const base = 'Thought Library';
+    const base = '생각서재 · Thought Library';
     document.title = active ? `${t.text} · ${t.phase} — ${base}` : base;
   }, [active, t.text, t.phase]);
   if (!active || visible) return null;

@@ -2,35 +2,63 @@ import { useEffect, useState } from 'react';
 import { ACCENT, BURGUNDY, CHAT_URL } from '../lib/constants.js';
 import { inArtifact } from '../lib/ai.js';
 
-// Logo 5a: line square (knowledge) overlapping a burgundy circle (thought); the overlap is olive.
-export function Logo() {
+// Logo: a wine-red square with an open book line.
+export function Logo({ size = 26 }) {
   return (
-    <div style={{ position: 'relative', width: 38, height: 38, flexShrink: 0 }}>
-      <div style={{ position: 'absolute', right: 0, bottom: 0, width: 24, height: 24, borderRadius: '50%', background: BURGUNDY }} />
-      <div style={{ position: 'absolute', left: 0, top: 0, width: 26, height: 26, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', left: 14, top: 14, width: 24, height: 24, borderRadius: '50%', background: ACCENT }} />
-      </div>
-      <div style={{ position: 'absolute', left: 0, top: 0, width: 26, height: 26, border: '1.5px solid #151515' }} />
+    <div className="logo-mark" style={{ width: size, height: size }} aria-hidden="true">
+      <div className="logo-mark-in" />
     </div>
   );
 }
 
-export function Header({ go }) {
+export const NAV = [['home', '홈'], ['library', '지식서재'], ['mock', '모의면접']];
+
+export function Header({ section, onNav, onSettings }) {
   return (
     <header className="site-header">
-      <div className="brand">
+      <div className="brand" role="button" tabIndex={0} onClick={() => onNav('home')}>
         <Logo />
-        <div className="brand-name">Thought<br />Library</div>
+        <div className="brand-name">생각서재<small>Thought Library</small></div>
       </div>
       <nav className="site-nav">
-        <span onClick={go.lib}>Library</span>
-        <span onClick={go.q}>Questions</span>
-        <span onClick={go.p}>Passage</span>
-        <span onClick={go.t}>Timer</span>
-        <span onClick={go.m}>My Page</span>
-        {inArtifact() && <a className="nav-chat" href={CHAT_URL} target="_blank" rel="noopener noreferrer">Chat ↗</a>}
+        {NAV.map(([k, l]) => <span key={k} className={section === k ? 'on' : ''} onClick={() => onNav(k)}>{l}</span>)}
       </nav>
+      <div className="header-right">
+        {inArtifact() && <a className="nav-chat" href={CHAT_URL} target="_blank" rel="noopener noreferrer">Chat ↗</a>}
+        <button className="header-settings" onClick={onSettings}>설정</button>
+      </div>
     </header>
+  );
+}
+
+// Phones get the three destinations as a tab bar at the bottom.
+export function TabBar({ section, onNav }) {
+  const icon = { home: '⌂', library: '讀', mock: '言' };
+  return (
+    <nav className="tab-bar">
+      {NAV.map(([k, l]) => (
+        <button key={k} className={section === k ? 'on' : ''} onClick={() => onNav(k)}><b>{icon[k]}</b>{l}</button>
+      ))}
+    </nav>
+  );
+}
+
+export const MOCK_TABS = [['questions', '예상 질문'], ['passage', '제시문'], ['practice', '실전 연습'], ['records', '내 기록']];
+
+export function MockHeader({ tab, onTab, recordCount }) {
+  return (
+    <div className="mock-head">
+      <div className="home-eyebrow" style={{ textAlign: 'left' }}>MOCK INTERVIEW</div>
+      <h1 className="mock-title">모의면접</h1>
+      <p className="mock-lede">질문을 고르고 → 준비하고 → 답하고 → 피드백을 확인하세요.</p>
+      <div className="mock-tabs" role="tablist">
+        {MOCK_TABS.map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => onTab(k)}>
+            {l}{k === 'records' && recordCount ? <small>{recordCount}회</small> : null}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -38,16 +66,14 @@ export function Intro({ onSkip }) {
   const pop = (style, delay) => <div className="intro-pop" style={{ ...style, animationDelay: delay + 's' }} />;
   return (
     <div className="intro" onClick={onSkip}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end' }}>
-          {pop({ width: 31, height: 31, border: '1.5px solid #b5b2ac' }, 0.1)}
-          {pop({ width: 34, height: 34, borderRadius: '17px 17px 0 0', background: ACCENT }, 0.25)}
-          {pop({ width: 34, height: 34, marginLeft: -2, borderRadius: '50%', background: BURGUNDY }, 0.4)}
-        </div>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end' }}>
+        {pop({ width: 31, height: 31, border: '1.5px solid #c9a58f' }, 0.1)}
+        {pop({ width: 34, height: 34, borderRadius: '17px 17px 0 0', background: ACCENT }, 0.25)}
+        {pop({ width: 34, height: 34, marginLeft: -2, borderRadius: '50%', background: BURGUNDY }, 0.4)}
       </div>
-      <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(34px,5vw,60px)', letterSpacing: '-0.02em', color: 'var(--cream)', opacity: 0, animation: 'tlUp 1s cubic-bezier(.2,.7,.2,1) .7s forwards' }}>Thought Library</div>
+      <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(34px,5vw,60px)', letterSpacing: '-0.02em', color: 'var(--cream)', opacity: 0, animation: 'tlUp 1s cubic-bezier(.2,.7,.2,1) .7s forwards' }}>생각서재</div>
       <div style={{ width: 64, height: 1, background: '#9a9893', transformOrigin: 'left', transform: 'scaleX(0)', animation: 'tlLine .8s ease 1.1s forwards' }} />
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.3em', color: '#b5b2ac', opacity: 0, animation: 'tlUp .9s ease 1.2s forwards' }}>ARCHIVING PAGE</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.3em', color: '#b5b2ac', opacity: 0, animation: 'tlUp .9s ease 1.2s forwards' }}>THOUGHT LIBRARY</div>
     </div>
   );
 }
@@ -82,7 +108,7 @@ export function Footer({ onSettings, aiOn }) {
   const install = async () => { if (!installEvent) return; installEvent.prompt(); await installEvent.userChoice; installEvent = null; setCanInstall(false); };
   return (
     <footer className="site-footer">
-      <span>© Thought Library</span>
+      <span>© 생각서재 · Thought Library</span>
       <span>
         {canInstall && <><span className="link" onClick={install}>앱으로 설치 (바탕화면·홈 화면)</span> · </>}
         {inArtifact()

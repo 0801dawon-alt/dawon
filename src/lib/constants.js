@@ -63,9 +63,9 @@ export const catColor = c => CAT_COLORS[c] || NEUTRAL;
 export const HOMEPAGE_URL = 'https://thought-library.github.io/';
 export const CLAUDE_URL = 'https://claude.ai/artifact/Y9WdgjDnkGwq1eqap33XgE';
 
-export const ACCENT = '#5d6b3a';
-export const ACCENT2 = '#5d6b3a';
-export const BURGUNDY = '#7F4C4C';
+export const ACCENT = '#8a2b3a';
+export const ACCENT2 = '#7b5a45';
+export const BURGUNDY = '#5a1f2b';
 
 export const FILLERS = ['음', '어', '그', '약간', '이제', '뭔가', '그러니까', '사실', '좀'];
 

@@ -5,8 +5,8 @@ import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, SEED_IDS,
 import { connectRecords } from './lib/records.js';
 import { ctx, loadJSON, parseJSON, saveJSON, scrollToEl, track, uid } from './lib/util.js';
 import { decodeSync, encodeSync, encodeSyncPlain, mergeAttemptLists } from './lib/sync.js';
-import { Footer, Header, Intro, Toast } from './components/Chrome.jsx';
-import Hero from './components/Hero.jsx';
+import { Footer, Header, Intro, MockHeader, TabBar, Toast } from './components/Chrome.jsx';
+import Home from './components/Home.jsx';
 import Library from './components/Library.jsx';
 import { DetailPanel, EntryForm } from './components/Detail.jsx';
 import Questions from './components/Questions.jsx';
@@ -90,6 +90,26 @@ export default function App() {
   const [timer, setTimer] = useState({ prep: 300, ans: 180, phase: 'idle', remain: 300, running: false, endsAt: 0, leftMs: 0, overtime: false, over: 0 });
   const timerRef = useRef(timer); timerRef.current = timer;
 
+  // Pages: home, library, or a mock-interview tab; kept in the address as #/library, #/mock/practice …
+  const MOCK = ['questions', 'passage', 'practice', 'records'];
+  const readRoute = () => {
+    const m = location.hash.match(/^#\/(library|mock)(?:\/(\w+))?/);
+    if (!m) return { section: 'home', tab: 'questions' };
+    return { section: m[1], tab: MOCK.includes(m[2]) ? m[2] : 'questions' };
+  };
+  const [route, setRoute] = useState(readRoute);
+  useEffect(() => {
+    const on = () => setRoute(readRoute());
+    window.addEventListener('popstate', on); window.addEventListener('hashchange', on);
+    return () => { window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const nav = (section, tab) => {
+    const next = { section, tab: tab || (section === 'mock' ? route.tab : route.tab) };
+    const hash = section === 'home' ? '#/' : section === 'library' ? '#/library' : '#/mock/' + next.tab;
+    if (location.hash !== hash) history.pushState(null, '', location.pathname + location.search + hash);
+    setRoute(next);
+    window.scrollTo(0, 0);
+  };
   const refs = { lib: useRef(null), q: useRef(null), p: useRef(null), t: useRef(null), r: useRef(null), m: useRef(null) };
   const acRef = useRef(null);
   const toastT = useRef(0);
@@ -98,7 +118,13 @@ export default function App() {
   useEffect(() => { const id = setTimeout(() => setIntro(false), INTRO_MS); return () => clearTimeout(id); }, []);
 
   const flash = useCallback(t => { setToast(t); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(''), Math.max(2600, t.length * 70)); }, []);
-  const scroll = key => scrollToEl(refs[key].current);
+  // Older 'scroll to section' calls now open the page that holds that section.
+  const PAGE = { lib: ['library'], q: ['mock', 'questions'], p: ['mock', 'passage'], t: ['mock', 'practice'], r: ['mock', 'practice'], m: ['mock', 'records'] };
+  const scroll = key => {
+    const [sec, tab] = PAGE[key];
+    if (route.section === sec && (!tab || route.tab === tab)) { scrollToEl(refs[key].current); return; }
+    nav(sec, tab);
+  };
   // History goes to the viewer's private space on claude.ai when available, else this browser.
   const attemptsRef = useRef(attempts); attemptsRef.current = attempts;
   const remote = useRef(null);
@@ -371,29 +397,41 @@ export default function App() {
     setForm(null); flash(f.id || patch.summary || !hasApiKey() ? '저장했습니다' : '저장했습니다 · Claude가 내용을 채우는 중…');
   };
 
-  const go = { lib: () => scroll('lib'), q: () => scroll('q'), p: () => scroll('p'), t: () => scroll('t'), m: () => scroll('m') };
 
+  const show = (sec, tab) => route.section === sec && (!tab || route.tab === tab);
   return (
-    <div className="page">
-      <Header go={go} />
-      <Hero
-        t0={t0} categories={categories} today={today} hasAttempts={attempts.length > 0}
-        onToday={() => {
-          const all = entries.flatMap(e => e.questions || []);
-          if (today) practice(today.q); else if (all.length) practice(all[Math.floor(Math.random() * all.length)]);
-        }}
-        onContinue={() => scroll(attempts.length ? 'm' : 'lib')}
-        onCategory={c => { setCatState(c); setPageState(0); scroll('lib'); }}
-      />
+    <div className="page routed">
+      <Header section={route.section} onNav={k => nav(k, k === 'mock' ? route.tab : undefined)} onSettings={() => setSettingsOpen(true)} />
+      <main className="main">
+      <div hidden={!show('home')}>
+        <Home
+          entries={entries} categories={categories} today={today}
+          onLibrary={() => nav('library')}
+          onCategory={c => { setCatState(c); setPageState(0); nav('library'); }}
+          onMock={tab => nav('mock', tab)}
+          onToday={() => {
+            const all = entries.flatMap(e => e.questions || []);
+            if (today) practice(today.q); else if (all.length) practice(all[Math.floor(Math.random() * all.length)]);
+          }}
+        />
+      </div>
+      <div hidden={!show('library')}>
       <Library
         ref={refs.lib} entries={entries} categories={categories}
         cat={cat} setCat={c => { setCatState(c); setPageState(0); }}
         search={search} setSearch={v => { setSearchState(v); setPageState(0); }}
-        page={page} setPage={p => { setPageState(p); scroll('lib'); }}
+        page={page} setPage={p => { setPageState(p); scrollToEl(refs.lib.current); }}
         onOpen={openTopic} viewed={viewed} onNew={() => setForm(EMPTY_FORM)}
       />
+      </div>
+      {route.section === 'mock' && <MockHeader tab={route.tab} onTab={t => nav('mock', t)} recordCount={attempts.length} />}
+      <div hidden={!show('mock', 'questions')}>
       <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} myQuestions={myQuestions} saveMyQuestions={saveMyQuestions} onPractice={practice} onFallback={onFallback} />
+      </div>
+      <div hidden={!show('mock', 'passage')}>
       <Passage ref={refs.p} entries={entries} topicId={validId(pTopic)} setTopicId={setPTopic} onPractice={practice} onFallback={onFallback} flash={flash} />
+      </div>
+      <div hidden={!show('mock', 'practice')}>
       <Timer
         ref={refs.t} timer={timer} question={tQuestion} setQuestion={setTQuestion}
         onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q), myQuestions.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
@@ -414,10 +452,15 @@ export default function App() {
         onCarryQuestions={qs => { const n = mergeMyQuestions(qs); if (n) flash(`홈페이지에서 입력한 질문 ${n}개를 질문 목록에 보관했어요`); }}
         onImport={importSync}
       />
+      </div>
+      <div hidden={!show('mock', 'records')}>
       <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onOpenBook={() => setBookOpen(true)} myQuestions={myQuestions} onImport={importSync}
         bookCount={new Set([...myQuestions.map(x => x.q.trim()), ...attempts.filter(a => a.q && a.q !== '(질문 없음)').map(a => a.q.trim())]).size} onPractice={practice} flash={flash} />
+      </div>
+      </main>
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
-      <MiniTimer timer={timer} timerRef={refs.t} onClick={() => scroll('t')} />
+      <MiniTimer key={route.section + route.tab} timer={timer} timerRef={refs.t} onClick={() => scroll('t')} />
+      <TabBar section={route.section} onNav={k => nav(k, k === 'mock' ? route.tab : undefined)} />
 
       {od && (
         <DetailPanel
