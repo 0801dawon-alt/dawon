@@ -31,15 +31,29 @@ export async function bankModel(q) {
 
 const shuffle = a => { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; };
 
-// Questions for a topic, preferring the requested type and skipping ones already on screen.
-export async function bankQuestions(entry, type, count, shown = []) {
+// Value-judgement subtopics whose own questions all count as 가치 판단형.
+const VALUE_TOPIC = id => /^k(18[3-9]|19\d|20[0-3])$/.test(id);
+const VALUE = '가치 판단형';
+// The old 압박 level was folded into 심화.
+const level = ty => (ty === '압박' ? '심화' : ty || '기본');
+
+// Topic ids that have value-judgement questions ready, for narrowing the topic list.
+export async function valueTopicIds(entries = []) {
+  const b = await loadBank();
+  return new Set([...b.qs.filter(x => x.st === VALUE).map(x => x.t), ...entries.filter(e => VALUE_TOPIC(e.id)).map(e => e.id)]);
+}
+
+// Questions for a topic: the requested direction and level first, then the rest, skipping ones already on screen.
+export async function bankQuestions(entry, type, count, shown = [], style = '') {
   const b = await loadBank();
   const skip = new Set(shown.map(norm));
+  const valueTopic = VALUE_TOPIC(entry.id);
   const own = b.qs.filter(x => x.t === entry.id && !skip.has(norm(x.q)));
-  const same = shuffle(own.filter(x => x.ty === type)), rest = shuffle(own.filter(x => x.ty !== type));
   const base = (entry.questions || []).filter(q => !skip.has(norm(q)) && !own.some(x => norm(x.q) === norm(q)))
-    .map(q => ({ q, i: '서재 예상 질문', m: b.models.get(norm(q)) || '' }));
-  return [...same, ...rest, ...shuffle(base)].slice(0, count).map(x => ({ q: x.q, intent: x.i || '', model: x.m || '' }));
+    .map(q => ({ q, i: '서재 예상 질문', m: b.models.get(norm(q)) || '', st: valueTopic ? VALUE : '' }));
+  const score = x => (style && x.st === style ? 2 : 0) + (level(x.ty) === type ? 1 : 0);
+  const ranked = [...shuffle(own), ...shuffle(base)].map((x, n) => [x, score(x), n]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(([x]) => x);
+  return ranked.slice(0, count).map(x => ({ q: x.q, intent: x.i || '', model: x.m || '' }));
 }
 
 // The passage set closest to what was asked: same topic or theme first, then shared keywords.

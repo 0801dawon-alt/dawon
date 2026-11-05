@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { CAT_ORDER } from '../lib/constants.js';
 
 // Topic choice in two steps: a category (or all), then a search that narrows the topic list.
-export default function TopicPicker({ entries, value, onChange, dark = false }) {
-  const cur = entries.find(e => e.id === value);
+export default function TopicPicker({ entries: all, value, onChange, dark = false, only = null, onlyLabel = '' }) {
+  const [narrow, setNarrow] = useState(true);
+  const entries = useMemo(() => (only && narrow ? all.filter(e => only.has(e.id)) : all), [all, only, narrow]);
+  const cur = all.find(e => e.id === value);
   const [cat, setCat] = useState('전체');
   const [q, setQ] = useState('');
   const cats = useMemo(() => {
@@ -33,7 +35,15 @@ export default function TopicPicker({ entries, value, onChange, dark = false }) 
       <select className={field} style={{ minWidth: 0, width: '100%' }} value={value} aria-label="주제" onChange={ev => onChange(ev.target.value)}>
         {shown.map(e => <option key={e.id} value={e.id}>{(cat === '전체' ? '[' + e.category + '] ' : '') + e.title}</option>)}
       </select>
-      <span style={{ fontSize: 11.5, color: dark ? 'var(--muted-3)' : '#8a8780' }}>{list.length ? `${list.length}개 주제` : '검색 결과가 없어요'}</span>
+      <span style={{ fontSize: 11.5, color: dark ? 'var(--muted-3)' : '#8a8780', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        {list.length ? `${list.length}개 주제` : '검색 결과가 없어요'}
+        {only && (
+          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={narrow} onChange={ev => { setNarrow(ev.target.checked); if (ev.target.checked && !only.has(value)) { const f = all.find(e => only.has(e.id)); if (f) onChange(f.id); } }} />
+            {onlyLabel}
+          </label>
+        )}
+      </span>
     </div>
   );
 }

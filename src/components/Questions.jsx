@@ -1,7 +1,7 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES, Q_TYPES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
-import { bankQuestions } from '../lib/bank.js';
+import { bankQuestions, valueTopicIds } from '../lib/bank.js';
 import { addToUserBank } from '../lib/userBank.js';
 import { ctx, pad, parseJSON, track, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
@@ -11,7 +11,6 @@ import TopicPicker from './TopicPicker.jsx';
 const TYPE_GUIDE = {
   기본: '찬반이 갈리는 지점을 짚어 지원자의 입장과 근거를 요구하는 질문',
   심화: '두 가치(예: 효율 vs 형평, 자유 vs 안전)가 충돌하는 딜레마를 제시하고 우선순위를 묻는 질문. 필요하면 관련 시사 상식(주요 사회 현상, 수치·연도, 해외 사례)을 맥락으로 제시하되 법률 지식은 묻지 말 것',
-  압박: '지원자가 택할 법한 입장의 약점·반례·부작용을 찌르며 반박을 요구하는 질문. 필요하면 관련 통계나 현실 사례를 들이밀며 압박하되 법률 지식은 묻지 말 것',
 };
 const COUNTS = [[1, '1개'], [2, '2개'], [3, '3개'], [5, '5개']];
 
@@ -21,7 +20,7 @@ async function generate(e, qType, qStyle, qCount, shown) {
   const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n[질문 방향] ${QS.k}: ${QS.g}\n아래 주제로 ${TYPE_GUIDE[qType]} ${qCount}개를 만들어라.\n[필수 조건]\n- 실제 면접에 출제될 가능성이 높은, 찬반이 명확히 대립하거나 구체적 의견 제시를 요구하는 질문일 것.\n- 실제 로스쿨 기출처럼 생각을 여러 단계로 밀고 가게 하라: 원인 분석 → 입장과 근거 → 반대 입장의 가장 강한 논거에 대한 재반박 → 대안과 그 부작용. 한 질문 안에 이 가운데 두 단계 이상을 요구해도 된다(예: '~의 원인을 분석하고, 지원자가 담당자라면 어떤 대안을 택하겠으며 그 대안의 부작용은 어떻게 줄이겠습니까?').\n- 단순 지식 확인, 막연한 '어떻게 생각하나요?' 식 질문 금지. 구체적 정책·제도·사례·수치·판례 등 맥락을 1문장 제시한 뒤 질문할 것(전체 2~3문장 허용).\n- 맥락이 실제 정책·법안·판결·사건·통계라면 실제로 존재하거나 논의·보도된 것만 쓰고, 가능하면 연도나 주체를 밝힐 것. 특정 기관이 실제로 하지 않은 일을 했다고 쓰지 말 것.\n- 사례를 만들어 써도 되며 가상이라고 밝힐 필요는 없지만, 한국의 현실과 맞아떨어져야 한다(실제로 있을 법한 상황·수치·제도 범위). '가령', '예를 들어'로 시작하는 가정 서술은 꼭 필요할 때만 쓴다.\n- 현실에 맞는 맥락이 마땅치 않으면 사례를 길게 풀지 말고, 대립 지점이 분명한 질문을 짧고 명료하게 던질 것.\n- 질문은 반드시 '~입니까?', '~하겠습니까?', '~생각합니까?' 등 '까?'로 끝나거나 '~답변해보시오.', '~제시해보시오.'로 끝낼 것.\n- 아래 기존 예상 질문과 쟁점·표현이 겹치지 않을 것:\n${avoid || '(없음)'}\n각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`));
   const list = Array.isArray(r) ? r.filter(x => x && x.q) : null;
   if (list && list.length) return { list, ai: true };
-  const fromBank = await bankQuestions(e, qType, qCount, shown);
+  const fromBank = await bankQuestions(e, qType, qCount, shown, qStyle);
   if (!fromBank.length) markUnreadable();
   return { list: fromBank, ai: false };
 }
@@ -45,6 +44,13 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
   const [manualOpen, setManualOpen] = useState(false);
   const [manualText, setManualText] = useState('');
   const [modelOpen, setModelOpen] = useState(null);
+  const [valueIds, setValueIds] = useState(null);
+  useEffect(() => { if (qStyle === '가치 판단형' && !valueIds) valueTopicIds(entries).then(setValueIds); }, [qStyle, valueIds, entries]);
+  // Picking the value direction moves to a topic that has such questions ready.
+  useEffect(() => {
+    if (qStyle !== '가치 판단형' || !valueIds || valueIds.has(topicId)) return;
+    const f = entries.find(e => valueIds.has(e.id)); if (f) setTopicId(f.id);
+  }, [qStyle, valueIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = async () => {
     track('questions', '예상 질문 생성');
@@ -55,7 +61,7 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
     setLoading(false);
     if (list.length) { setQList(list); setModelOpen(null); }
     // Questions Claude wrote stay in the bank for later practice without AI.
-    if (ai) list.forEach(x => addToUserBank({ k: 'q', t: e.id, ty: qType, q: x.q, i: x.intent || '' }));
+    if (ai) list.forEach(x => addToUserBank({ k: 'q', t: e.id, ty: qType, st: qStyle, q: x.q, i: x.intent || '' }));
     if (!ai && !list.length) onFallback();
   };
   const addManual = () => {
@@ -82,7 +88,7 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
             <p className="lede" style={{ color: 'var(--muted-3)' }}>서재의 주제를 바탕으로 면접관이 던질 법한 질문을 만듭니다.</p>
           </div>
           <div className="field-label" style={{ color: 'var(--muted-2)' }}>주제
-            <TopicPicker entries={entries} value={topicId} onChange={setTopicId} dark />
+            <TopicPicker entries={entries} value={topicId} onChange={setTopicId} dark only={qStyle === '가치 판단형' ? valueIds : null} onlyLabel="가치 판단 질문이 준비된 주제만" />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span style={sub}>질문 방향</span>
