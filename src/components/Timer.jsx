@@ -115,7 +115,7 @@ const Timer = forwardRef(function Timer({ timer, question, setQuestion, onRandom
           <span className="label" style={{ color: 'var(--muted)' }}>연습할 질문</span>
           <textarea ref={qRef} className="timer-q" rows={1} value={question} onChange={ev => setQuestion(ev.target.value)} placeholder="질문을 입력하거나, 위에서 ‘연습 →’을 누르세요." />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(28px,5vw,64px)', alignItems: 'center' }}>
+        <div className="timer-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(28px,5vw,64px)', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div className="timer-ring-wrap" data-reveal="1" ref={wrapRef}>
               <div className="timer-ring" style={{ background: ring }}>

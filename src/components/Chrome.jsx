@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CHAT_URL } from '../lib/constants.js';
 import { inArtifact } from '../lib/ai.js';
 
@@ -18,8 +18,35 @@ export function Logo({ size = 34 }) {
 }
 
 export const NAV = [['home', '홈'], ['library', '지식서가'], ['mock', '모의면접']];
+export const MOCK_TABS = [['questions', '예상 질문'], ['passage', '제시문'], ['practice', '실전 연습'], ['records', '내 기록']];
 
-export function Header({ section, onNav, onSettings }) {
+// The mock-interview pages, shown under '모의면접' when it is pressed.
+function MockMenu({ tab, onPick, className }) {
+  return (
+    <div className={className} role="menu">
+      {MOCK_TABS.map(([k, l]) => (
+        <button key={k} role="menuitem" className={tab === k ? 'on' : ''} onClick={e => { e.stopPropagation(); onPick(k); }}>{l}</button>
+      ))}
+    </div>
+  );
+}
+
+function useOutsideClose(open, setOpen) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const esc = e => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc); };
+  }, [open, setOpen]);
+  return ref;
+}
+
+export function Header({ section, tab, onNav, onSettings }) {
+  const [open, setOpen] = useState(false);
+  const ref = useOutsideClose(open, setOpen);
+  const cur = (MOCK_TABS.find(([k]) => k === tab) || MOCK_TABS[0])[1];
   return (
     <header className="site-header">
       <div className="brand" role="button" tabIndex={0} onClick={() => onNav('home')}>
@@ -27,7 +54,12 @@ export function Header({ section, onNav, onSettings }) {
         <div className="brand-name">생각서재<small>Thought Library</small></div>
       </div>
       <nav className="site-nav">
-        {NAV.map(([k, l]) => <span key={k} className={section === k ? 'on' : ''} onClick={() => onNav(k)}>{l}</span>)}
+        <span className={section === 'home' ? 'on' : ''} onClick={() => onNav('home')}>홈</span>
+        <span className={section === 'library' ? 'on' : ''} onClick={() => onNav('library')}>지식서가</span>
+        <span ref={ref} className={'nav-mock' + (section === 'mock' ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open}>
+          모의면접{section === 'mock' && <small>· {cur}</small>}<i className="nav-caret">▾</i>
+          {open && <MockMenu tab={section === 'mock' ? tab : ''} className="nav-menu" onPick={k => { setOpen(false); onNav('mock', k); }} />}
+        </span>
       </nav>
       <div className="header-right">
         {inArtifact() && <a className="nav-chat" href={CHAT_URL} target="_blank" rel="noopener noreferrer">Chat ↗</a>}
@@ -37,34 +69,17 @@ export function Header({ section, onNav, onSettings }) {
   );
 }
 
-// Phones get the three destinations as a tab bar at the bottom.
-export function TabBar({ section, onNav }) {
-  const icon = { home: '⌂', library: '讀', mock: '言' };
+// Phones get the three destinations as a tab bar at the bottom; '모의면접' opens its four pages.
+export function TabBar({ section, tab, onNav }) {
+  const [open, setOpen] = useState(false);
+  const ref = useOutsideClose(open, setOpen);
   return (
-    <nav className="tab-bar">
-      {NAV.map(([k, l]) => (
-        <button key={k} className={section === k ? 'on' : ''} onClick={() => onNav(k)}><b>{icon[k]}</b>{l}</button>
-      ))}
+    <nav className="tab-bar" ref={ref}>
+      {open && <MockMenu tab={section === 'mock' ? tab : ''} className="tab-menu" onPick={k => { setOpen(false); onNav('mock', k); }} />}
+      <button className={section === 'home' ? 'on' : ''} onClick={() => { setOpen(false); onNav('home'); }}><b>⌂</b>홈</button>
+      <button className={section === 'library' ? 'on' : ''} onClick={() => { setOpen(false); onNav('library'); }}><b>▤</b>지식서가</button>
+      <button className={section === 'mock' ? 'on' : ''} onClick={() => setOpen(o => !o)}><b>◎</b>모의면접</button>
     </nav>
-  );
-}
-
-export const MOCK_TABS = [['questions', '예상 질문'], ['passage', '제시문'], ['practice', '실전 연습'], ['records', '내 기록']];
-
-export function MockHeader({ tab, onTab, recordCount }) {
-  return (
-    <div className="mock-head">
-      <div className="home-eyebrow" style={{ textAlign: 'left' }}>MOCK INTERVIEW</div>
-      <h1 className="mock-title">모의면접</h1>
-      <p className="mock-lede">질문을 고르고 → 준비하고 → 답하고 → 피드백을 확인하세요.</p>
-      <div className="mock-tabs" role="tablist">
-        {MOCK_TABS.map(([k, l]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => onTab(k)}>
-            {l}{k === 'records' && recordCount ? <small>{recordCount}회</small> : null}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 

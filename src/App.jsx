@@ -5,7 +5,7 @@ import { ANALYSIS_KEY, ATTEMPTS_KEY, ENTRIES_KEY, MYQ_KEY, VIEWED_KEY, SEED_IDS,
 import { connectRecords } from './lib/records.js';
 import { ctx, fixQuestion, loadJSON, parseJSON, saveJSON, scrollToEl, track, uid } from './lib/util.js';
 import { decodeSync, encodeSync, encodeSyncPlain, mergeAttemptLists } from './lib/sync.js';
-import { Footer, Header, Intro, MockHeader, TabBar, Toast } from './components/Chrome.jsx';
+import { Footer, Header, Intro, TabBar, Toast } from './components/Chrome.jsx';
 import Home from './components/Home.jsx';
 import Library from './components/Library.jsx';
 import { DetailPanel, EntryForm } from './components/Detail.jsx';
@@ -401,7 +401,7 @@ export default function App() {
   const show = (sec, tab) => route.section === sec && (!tab || route.tab === tab);
   return (
     <div className="page routed">
-      <Header section={route.section} onNav={k => nav(k, k === 'mock' ? route.tab : undefined)} onSettings={() => setSettingsOpen(true)} />
+      <Header section={route.section} tab={route.tab} onNav={(k, t) => nav(k, t)} onSettings={() => setSettingsOpen(true)} />
       <main className="main">
       <div hidden={!show('home')}>
         <Home
@@ -424,7 +424,6 @@ export default function App() {
         onOpen={openTopic} viewed={viewed} onNew={() => setForm(EMPTY_FORM)}
       />
       </div>
-      {route.section === 'mock' && <MockHeader tab={route.tab} onTab={t => nav('mock', t)} recordCount={attempts.length} />}
       <div hidden={!show('mock', 'questions')}>
       <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} myQuestions={myQuestions} saveMyQuestions={saveMyQuestions} onPractice={practice} onFallback={onFallback} />
       </div>
@@ -460,7 +459,7 @@ export default function App() {
       </main>
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
       <MiniTimer key={route.section + route.tab} timer={timer} timerRef={refs.t} onClick={() => scroll('t')} />
-      <TabBar section={route.section} onNav={k => nav(k, k === 'mock' ? route.tab : undefined)} />
+      <TabBar section={route.section} tab={route.tab} onNav={(k, t) => nav(k, t)} />
 
       {od && (
         <DetailPanel

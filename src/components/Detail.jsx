@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NEUTRAL, tagLinks } from '../lib/constants.js';
 import { pad } from '../lib/util.js';
-import CASES from '../data/cases.js';
 import TAGFIX from '../data/tagfix.js';
 import PROCON from '../data/procon.js';
 import { ask, hasApiKey, inArtifact, lastAiIssue } from '../lib/ai.js';
@@ -155,12 +154,9 @@ export function ConfirmLink({ label, armedLabel, onConfirm, style }) {
 }
 
 export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, onEdit, onDelete, onPractice, onSaveModel, onMyView, onScraps, onToQuestions, onToPassage }) {
-  // Case links only where real rulings exist: 대법원 (S) and/or 헌법재판소 (C).
   const fix = PROCON[od.id];
   const pc = { motion: fix ? fix.motion : (od.motion || ''), pro: fix ? fix.pro : (od.pro || []), con: fix ? fix.con : (od.con || []) };
-  const courts = CASES[od.id] || '';
-  const keepCase = c => (c.label === '대법원 판례' ? courts.includes('S') : c.label === '헌법재판소 결정' ? courts.includes('C') : !!courts);
-  const tags = (TAGFIX[od.id] || od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: t.cases.filter(keepCase) }));
+  const tags = (TAGFIX[od.id] || od.tags || od.keywords || []).slice(0, 4).map(tagLinks).map(t => ({ ...t, cases: [] }));
   const notes = useNotes(od.id);
   const askNotes = notes.filter(isQuestionNote), readNotes = notes.filter(n => !isQuestionNote(n));
   useEffect(() => { const k = e => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
@@ -236,7 +232,7 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
           {tags.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <div style={sectionLabel}>{courts ? '관련 뉴스 · 칼럼 · 판례' : '관련 뉴스 · 칼럼'}</div>
+                <div style={sectionLabel}>관련 뉴스 · 칼럼</div>
                 <div style={{ fontSize: 11.5, color: '#8a8780' }}>실시간 검색 연결 · 관련도순</div>
               </div>
               {tags.map(tg => (
