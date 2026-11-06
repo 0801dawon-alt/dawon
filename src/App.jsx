@@ -99,7 +99,7 @@ export default function App() {
   };
   const [route, setRoute] = useState(readRoute);
   useEffect(() => {
-    const on = () => setRoute(readRoute());
+    const on = () => { const r = readRoute(); if (r.section === 'mock') pendingTab.current = { tab: r.tab, smooth: false }; setRoute(r); };
     window.addEventListener('popstate', on); window.addEventListener('hashchange', on);
     return () => { window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,9 +107,48 @@ export default function App() {
     const next = { section, tab: tab || (section === 'mock' ? route.tab : route.tab) };
     const hash = section === 'home' ? '#/' : section === 'library' ? '#/library' : '#/mock/' + next.tab;
     if (location.hash !== hash) history.pushState(null, '', location.pathname + location.search + hash);
+    const within = route.section === 'mock' && section === 'mock';
     setRoute(next);
-    window.scrollTo(0, 0);
+    // Inside the mock-interview page every step sits on one long page: move to that step's screen.
+    if (section === 'mock') { pendingTab.current = { tab: next.tab, smooth: within }; if (within) goPanel(next.tab, true); }
+    else window.scrollTo(0, 0);
   };
+  const pendingTab = useRef(route.section === 'mock' && route.tab !== 'questions' ? { tab: route.tab, smooth: false } : null);
+  const panelRefs = { questions: useRef(null), passage: useRef(null), practice: useRef(null), answer: useRef(null), records: useRef(null) };
+  const spyLock = useRef(0);
+  const goPanel = (tab, smooth) => {
+    const el = panelRefs[tab]?.current; if (!el) return;
+    spyLock.current = Date.now() + (smooth ? 900 : 200);
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 68, behavior: smooth ? 'smooth' : 'auto' });
+  };
+  // Arriving on the mock page from elsewhere jumps straight to the chosen step.
+  useEffect(() => {
+    if (route.section !== 'mock' || !pendingTab.current || pendingTab.current.smooth) return;
+    const { tab } = pendingTab.current; pendingTab.current = null;
+    setActivePanel(tab);
+    requestAnimationFrame(() => requestAnimationFrame(() => goPanel(tab, false)));
+  }, [route]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The step on screen becomes the current one: it rises into place and the menu follows it.
+  const [activePanel, setActivePanel] = useState(route.tab);
+  useEffect(() => {
+    if (route.section !== 'mock') return undefined;
+    document.documentElement.classList.add('snap-on');
+    const ratios = {};
+    const io = new IntersectionObserver(ents => {
+      ents.forEach(en => { ratios[en.target.dataset.panel] = en.intersectionRatio * Math.min(1, en.intersectionRect.height / Math.max(1, window.innerHeight)); });
+      const best = Object.entries(ratios).sort((a, b) => b[1] - a[1])[0];
+      if (!best || best[1] <= 0) return;
+      const key = best[0];
+      setActivePanel(key);
+      const tab = key === 'answer' ? 'practice' : key;
+      if (Date.now() < spyLock.current) return;
+      setRoute(r => (r.section === 'mock' && r.tab !== tab ? { ...r, tab } : r));
+      const hash = '#/mock/' + tab;
+      if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
+    }, { threshold: [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1] });
+    Object.values(panelRefs).forEach(r => r.current && io.observe(r.current));
+    return () => { io.disconnect(); document.documentElement.classList.remove('snap-on'); };
+  }, [route.section]); // eslint-disable-line react-hooks/exhaustive-deps
   const refs = { lib: useRef(null), q: useRef(null), p: useRef(null), t: useRef(null), r: useRef(null), m: useRef(null) };
   const acRef = useRef(null);
   const toastT = useRef(0);
@@ -122,7 +161,7 @@ export default function App() {
   const PAGE = { lib: ['library'], q: ['mock', 'questions'], p: ['mock', 'passage'], t: ['mock', 'practice'], r: ['mock', 'practice'], m: ['mock', 'records'] };
   const scroll = key => {
     const [sec, tab] = PAGE[key];
-    if (route.section === sec && (!tab || route.tab === tab)) { scrollToEl(refs[key].current); return; }
+    if (route.section === sec && (!tab || route.tab === tab || sec === 'mock')) { if (sec === 'mock') goPanel(key === 'r' ? 'answer' : tab, true); else scrollToEl(refs[key].current); return; }
     nav(sec, tab);
   };
   // History goes to the viewer's private space on claude.ai when available, else this browser.
@@ -398,7 +437,9 @@ export default function App() {
   };
 
 
-  const show = (sec, tab) => route.section === sec && (!tab || route.tab === tab);
+  const show = (sec, tab) => route.section === sec && (!tab || sec === 'mock' || route.tab === tab);
+  const STEPS = [['questions', '예상 질문'], ['passage', '제시문'], ['practice', '타이머'], ['answer', '답변 기록'], ['records', '내 기록']];
+  const panel = key => ({ ref: panelRefs[key], 'data-panel': key, className: 'mock-panel' + (activePanel === key ? ' active' : '') });
   return (
     <div className="page routed">
       <Header section={route.section} tab={route.tab} onNav={(k, t) => nav(k, t)} onSettings={() => setSettingsOpen(true)} />
@@ -424,13 +465,14 @@ export default function App() {
         onOpen={openTopic} viewed={viewed} onNew={() => setForm(EMPTY_FORM)}
       />
       </div>
-      <div hidden={!show('mock', 'questions')}>
+      <div hidden={!show('mock')} className="mock-stack">
+      <div {...panel('questions')}>
       <Questions ref={refs.q} entries={entries} topicId={validId(qTopic)} setTopicId={setQTopic} qList={qList} setQList={setQList} myQuestions={myQuestions} saveMyQuestions={saveMyQuestions} onPractice={practice} onFallback={onFallback} />
       </div>
-      <div hidden={!show('mock', 'passage')}>
+      <div {...panel('passage')}>
       <Passage ref={refs.p} entries={entries} topicId={validId(pTopic)} setTopicId={setPTopic} onPractice={practice} onFallback={onFallback} flash={flash} />
       </div>
-      <div hidden={!show('mock', 'practice')}>
+      <div {...panel('practice')}>
       <Timer
         ref={refs.t} timer={timer} question={tQuestion} setQuestion={setTQuestion}
         onRandom={() => { const all = entries.flatMap(e => e.questions || []).concat(qList.map(x => x.q), myQuestions.map(x => x.q)); if (all.length) practice(all[Math.floor(Math.random() * all.length)]); }}
@@ -444,6 +486,8 @@ export default function App() {
         setPrep={v => setTimer(s => ({ ...s, prep: v, remain: s.phase === 'idle' ? (v || s.ans) : s.remain }))}
         setAns={v => setTimer(s => ({ ...s, ans: v, remain: s.phase === 'idle' && !s.prep ? v : s.remain }))}
       />
+      </div>
+      <div {...panel('answer')}>
       <Record
         ref={refs.r} timer={timer} question={tQuestion} setQuestion={setTQuestion} context={tContext} entries={entries} attempts={attempts} saveAttempts={saveAttempts}
         onFinish={() => setTimer(finishTimer)}
@@ -452,9 +496,17 @@ export default function App() {
         onImport={importSync}
       />
       </div>
-      <div hidden={!show('mock', 'records')}>
+      <div {...panel('records')}>
       <MyPage ref={refs.m} attempts={attempts} saveAttempts={saveAttempts} analysis={analysis} setAnalysis={setAnalysis} savedToClaude={recordsRemote} onOpenBook={() => setBookOpen(true)} myQuestions={myQuestions} onImport={importSync}
         bookCount={new Set([...myQuestions.map(x => x.q.trim()), ...attempts.filter(a => a.q && a.q !== '(질문 없음)').map(a => a.q.trim())]).size} onPractice={practice} flash={flash} />
+      </div>
+      <nav className="step-dots" aria-label="모의면접 단계">
+        {STEPS.map(([k, l], i) => (
+          <button key={k} className={'step-dot' + (activePanel === k ? ' on' : '')} onClick={() => goPanel(k, true)} aria-label={l}>
+            <span className="step-dot-label">{String(i + 1).padStart(2, '0')} {l}</span><span className="step-dot-mark" />
+          </button>
+        ))}
+      </nav>
       </div>
       </main>
       <Footer aiOn={aiOn} onSettings={() => setSettingsOpen(true)} />
