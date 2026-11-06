@@ -1,26 +1,24 @@
 import { forwardRef, useEffect, useState } from 'react';
-import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES, Q_TYPES } from '../lib/constants.js';
+import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
 import { bankQuestions, valueTopicIds } from '../lib/bank.js';
 import { addToUserBank } from '../lib/userBank.js';
-import { ctx, fixQuestion, isProCon, pad, parseJSON, track, uid } from '../lib/util.js';
+import { ctx, fixQuestion, pad, parseJSON, track, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
 import TopicPicker from './TopicPicker.jsx';
 
-const TYPE_GUIDE = {
-  기본: '찬반이 갈리는 지점을 짚어 지원자의 입장과 근거를 요구하는 질문',
-  심화: '두 가치(예: 효율 vs 형평, 자유 vs 안전)가 충돌하는 딜레마를 제시하고 우선순위를 묻는 질문. 필요하면 관련 시사 상식(주요 사회 현상, 수치·연도, 해외 사례)을 맥락으로 제시하되 법률 지식은 묻지 말 것',
-};
+// One level: the question takes a clear stance point and, where it helps, a dilemma or current-affairs context.
+const GUIDE = '찬반이 갈리는 지점이나 두 가치가 충돌하는 딜레마를 짚어 지원자의 판단과 근거를 요구하는 질문. 필요하면 관련 시사 상식(주요 사회 현상, 수치·연도, 해외 사례)을 맥락으로 제시하되 법률 지식은 묻지 말 것';
 const COUNTS = [[1, '1개'], [2, '2개'], [3, '3개'], [5, '5개']];
 
-async function generate(e, qType, qStyle, qCount, shown) {
+async function generate(e, qStyle, qCount, shown) {
   const QS = Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0];
   const avoid = (e.questions || []).map((q, i) => (i + 1) + '. ' + q).join('\n');
-  const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n[질문 방향] ${QS.k}: ${QS.g}\n아래 주제로 ${TYPE_GUIDE[qType]} ${qCount}개를 만들어라.\n[필수 조건]\n- 실제 면접에 출제될 가능성이 높은, 찬반이 명확히 대립하거나 구체적 의견 제시를 요구하는 질문일 것.\n- 실제 로스쿨 기출처럼 생각을 여러 단계로 밀고 가게 하라: 원인 분석 → 입장과 근거 → 반대 입장의 가장 강한 논거에 대한 재반박 → 대안과 그 부작용. 한 질문 안에 이 가운데 두 단계 이상을 요구해도 된다(예: '~의 원인은 무엇이며, 지원자가 담당자라면 어떤 대안을 택하겠습니까? 그 대안의 부작용은 어떻게 줄일지도 답변해보시오.').\n- 단순 지식 확인, 막연한 '어떻게 생각하나요?' 식 질문 금지. 구체적 정책·제도·사례·수치·판례 등 맥락을 1문장 제시한 뒤 질문할 것(전체 2~3문장 허용).\n- 맥락이 실제 정책·법안·판결·사건·통계라면 실제로 존재하거나 논의·보도된 것만 쓰고, 가능하면 연도나 주체를 밝힐 것. 특정 기관이 실제로 하지 않은 일을 했다고 쓰지 말 것.\n- 사례를 만들어 써도 되며 가상이라고 밝힐 필요는 없지만, 한국의 현실과 맞아떨어져야 한다(실제로 있을 법한 상황·수치·제도 범위). '가령', '예를 들어'로 시작하는 가정 서술은 꼭 필요할 때만 쓴다.\n- 현실에 맞는 맥락이 마땅치 않으면 사례를 길게 풀지 말고, 대립 지점이 분명한 질문을 짧고 명료하게 던질 것.\n- 질문은 반드시 '~입니까?', '~하겠습니까?', '~생각합니까?' 등 '까?'로 끝나거나 '~답변해보시오.', '~제시해보시오.'로 끝낼 것.\n- 한 문장 안에서 지시형과 의문형을 섞지 말 것. '근거를 답변하고, 부작용은 어떻게 줄이겠습니까?'처럼 앞은 지시, 뒤는 질문인 문장은 어색하다. '근거를 밝히고, 부작용을 어떻게 줄일지 답변해보시오.' 또는 '근거는 무엇이며, 부작용은 어떻게 줄이겠습니까?'처럼 한 가지 방식으로 끝낸다.\n- 아래 기존 예상 질문과 쟁점·표현이 겹치지 않을 것:\n${avoid || '(없음)'}\n각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`));
-  const list = Array.isArray(r) ? r.filter(x => x && x.q).map(x => ({ ...x, q: fixQuestion(x.q) })).filter(x => QS.k !== '찬반 입장형' || isProCon(x.q)) : null;
+  const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n[질문 방향] ${QS.k}: ${QS.g}\n아래 주제로 ${GUIDE} ${qCount}개를 만들어라.\n[필수 조건]\n- 실제 면접에 출제될 가능성이 높은, 찬반이 명확히 대립하거나 구체적 의견 제시를 요구하는 질문일 것.\n- 실제 로스쿨 기출처럼 생각을 여러 단계로 밀고 가게 하라: 원인 분석 → 입장과 근거 → 반대 입장의 가장 강한 논거에 대한 재반박 → 대안과 그 부작용. 한 질문 안에 이 가운데 두 단계 이상을 요구해도 된다(예: '~의 원인은 무엇이며, 지원자가 담당자라면 어떤 대안을 택하겠습니까? 그 대안의 부작용은 어떻게 줄일지도 답변해보시오.').\n- 단순 지식 확인, 막연한 '어떻게 생각하나요?' 식 질문 금지. 구체적 정책·제도·사례·수치·판례 등 맥락을 1문장 제시한 뒤 질문할 것(전체 2~3문장 허용).\n- 맥락이 실제 정책·법안·판결·사건·통계라면 실제로 존재하거나 논의·보도된 것만 쓰고, 가능하면 연도나 주체를 밝힐 것. 특정 기관이 실제로 하지 않은 일을 했다고 쓰지 말 것.\n- 사례를 만들어 써도 되며 가상이라고 밝힐 필요는 없지만, 한국의 현실과 맞아떨어져야 한다(실제로 있을 법한 상황·수치·제도 범위). '가령', '예를 들어'로 시작하는 가정 서술은 꼭 필요할 때만 쓴다.\n- 현실에 맞는 맥락이 마땅치 않으면 사례를 길게 풀지 말고, 대립 지점이 분명한 질문을 짧고 명료하게 던질 것.\n- 질문은 반드시 '~입니까?', '~하겠습니까?', '~생각합니까?' 등 '까?'로 끝나거나 '~답변해보시오.', '~제시해보시오.'로 끝낼 것.\n- 한 문장 안에서 지시형과 의문형을 섞지 말 것. '근거를 답변하고, 부작용은 어떻게 줄이겠습니까?'처럼 앞은 지시, 뒤는 질문인 문장은 어색하다. '근거를 밝히고, 부작용을 어떻게 줄일지 답변해보시오.' 또는 '근거는 무엇이며, 부작용은 어떻게 줄이겠습니까?'처럼 한 가지 방식으로 끝낸다.\n- 아래 기존 예상 질문과 쟁점·표현이 겹치지 않을 것:\n${avoid || '(없음)'}\n각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`));
+  const list = Array.isArray(r) ? r.filter(x => x && x.q).map(x => ({ ...x, q: fixQuestion(x.q) })) : null;
   if (list && list.length) return { list, ai: true };
-  const fromBank = await bankQuestions(e, qType, qCount, shown, qStyle);
+  const fromBank = await bankQuestions(e, qCount, shown, qStyle);
   if (!fromBank.length) markUnreadable();
   return { list: fromBank, ai: false };
 }
@@ -37,7 +35,6 @@ function BoxRow({ label, options, value, onChange }) {
 
 const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, qList, setQList, myQuestions, saveMyQuestions, onPractice, onFallback }, ref) {
   const [qStyle, setQStyle] = useState(Q_STYLES[0].k);
-  const [qType, setQType] = useState('기본');
   const [qCount, setQCount] = useState(3);
   const [loading, setLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -56,11 +53,11 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
     const e = entries.find(x => x.id === topicId);
     if (!e || loading) return;
     setLoading(true);
-    const { list, ai } = await generate(e, qType, qStyle, qCount, qList.map(x => x.q));
+    const { list, ai } = await generate(e, qStyle, qCount, qList.map(x => x.q));
     setLoading(false);
     if (list.length) { setQList(list); setModelOpen(null); }
     // Questions Claude wrote stay in the bank for later practice without AI.
-    if (ai) list.forEach(x => addToUserBank({ k: 'q', t: e.id, ty: qType, st: qStyle, q: x.q, i: x.intent || '' }));
+    if (ai) list.forEach(x => addToUserBank({ k: 'q', t: e.id, st: qStyle, q: x.q, i: x.intent || '' }));
     if (!ai && !list.length) onFallback(!qStyle ? '' : qList.length ? `이 주제의 ‘${qStyle}’ 질문을 모두 보여 드렸어요 · 다른 주제나 질문 방향을 골라 보세요.` : `이 주제에는 ‘${qStyle}’ 질문이 아직 없어요 · 다른 질문 방향을 골라 보세요.`);
   };
   const addManual = () => {
@@ -93,7 +90,6 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
             <BoxRow label="질문 방향" options={Q_STYLES.map(t => [t.k, t.k])} value={qStyle} onChange={setQStyle} />
             <span style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', paddingLeft: 68 }}>{(Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0]).d}</span>
           </div>
-          <BoxRow label="유형" options={Q_TYPES.map(t => [t, t])} value={qType} onChange={setQType} />
           <BoxRow label="개수" options={COUNTS} value={qCount} onChange={setQCount} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>

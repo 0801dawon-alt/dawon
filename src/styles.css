@@ -223,7 +223,8 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 .arch-body { transition: opacity .6s ease .55s, transform .6s ease .55s; padding: clamp(200px, 34vw, 320px) clamp(22px, 5vw, 64px) clamp(28px, 5vw, 56px); display: flex; flex-direction: column; gap: 30px; }
 .arch-title { position: absolute; left: 0; right: 0; top: clamp(72px, 15vw, 150px); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 0 18%; }
 .passage { display: flex; flex-direction: column; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line-soft); }
-.passage-label { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--ink); font-family: var(--serif); font-weight: 700; font-size: 15px; }
+.passage-label { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--ink); font-family: var(--serif); font-weight: 700; font-size: 15px; white-space: nowrap; flex-shrink: 0; }
+.passage-label.wide { width: auto; min-width: 34px; padding: 0 14px; border-radius: 999px; font-size: 14px; letter-spacing: 0.02em; }
 .passage-text { margin: 0; font-family: var(--serif); font-size: 15.5px; line-height: 1.95; text-align: justify; text-wrap: pretty; white-space: pre-wrap; word-break: keep-all; }
 .pq { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 

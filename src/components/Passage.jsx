@@ -1,7 +1,7 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, LAW_TYPES, P_COUNTS, P_LENS, P_MODES, VALUE_THEMES } from '../lib/constants.js';
-import { ask, markUnreadable } from '../lib/ai.js';
-import { bankPassage } from '../lib/bank.js';
+import { ask, hasApiKey, markUnreadable } from '../lib/ai.js';
+import { bankPassage, passageTopicIds } from '../lib/bank.js';
 import { addToUserBank } from '../lib/userBank.js';
 import { pad, parseJSON, track, fixQuestion } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
@@ -78,6 +78,15 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
   const [len, setLen] = useState('보통');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Without Claude only stored sets can be shown, so the topic list starts narrowed to topics that have one.
+  const [pIds, setPIds] = useState(null);
+  const moved = useRef(false);
+  useEffect(() => { passageTopicIds().then(setPIds); }, []);
+  useEffect(() => {
+    if (!pIds || moved.current || hasApiKey()) return;
+    moved.current = true;
+    if (!pIds.has(topicId)) { const f = entries.find(e => pIds.has(e.id)); if (f) setTopicId(f.id); }
+  }, [pIds]); // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState([]);
   const [modelOpen, setModelOpen] = useState(null);
@@ -113,7 +122,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
       // No Claude: serve a passage set written ahead of time for the closest topic.
       const words = mode === '직접' ? custom.split(/[\s,·와과및]+/).filter(w => w.length >= 2) : linked.list.flatMap(e => [e.title, ...(e.keywords || [])]);
       const b = await bankPassage({ mode, topicId, theme, words, related: linked.list.map(e => e.id) }, lawType, seen, len);
-      if (!b) { markUnreadable(); setLoading(false); onFallback(); return; }
+      if (!b) { markUnreadable(); setLoading(false); onFallback(`‘${linked.title}’와 연결된 제시문은 아직 준비 중이에요 · 제시문이 준비된 주제를 골라 보세요.`); return; }
       res = b.res; setSeen(s => [...s, b.id]);
       meta = `${b.res.lawType || lawType} · 저장된 문제${b.exact ? '' : ' · 가장 가까운 주제'}`;
     }
@@ -146,7 +155,7 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, marginTop: -6 }}>
               <BoxRow label="주제" options={P_MODES} value={mode} onChange={setMode} />
               {mode === '서재' && (
-                <TopicPicker entries={entries} value={topicId} onChange={setTopicId} />
+                <TopicPicker entries={entries} value={topicId} onChange={setTopicId} only={pIds && !hasApiKey() ? pIds : null} onlyLabel="제시문이 준비된 주제만" />
               )}
               {mode === '가치' && (
                 <select className="underline-field" value={theme} onChange={ev => setTheme(ev.target.value)}>
@@ -194,8 +203,8 @@ const Passage = forwardRef(function Passage({ entries, topicId, setTopicId, onPr
                 {result.passages.map((ps, i) => (
                   <div key={i} className="passage">
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <span className="passage-label">{ps.label}</span>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{ps.source || ''}</span>
+                      <span className={'passage-label' + ((ps.label || '').length > 1 ? ' wide' : '')}>{ps.label}</span>
+                      {ps.source && ps.source !== '쟁점 정리' && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{ps.source}</span>}
                     </div>
                     <p className="passage-text">{ps.text}</p>
                   </div>
