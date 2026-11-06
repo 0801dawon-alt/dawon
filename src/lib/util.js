@@ -69,3 +69,17 @@ export function fixQuestion(q) {
   if (!verb) return q;
   return (m[1] + verb).replace(/답변하고, /, '밝히고, ').replace(/(는|은) 어떻게 (\S+지)$/, (_, p, v) => (p === '는' ? '를' : '을') + ' 어떻게 ' + v) + ' 답변해보시오.';
 }
+
+// A question that can be answered '찬성' or '반대': its last question sentence is a single yes/no
+// question with no question word and no 'A입니까, B입니까?' choice, and anything after it is only an
+// instruction ('~고려해 답해 보십시오.').
+const WH = /어떻게|어떤|무엇|무슨|뭐|누구|누가|어디|얼마나|언제|왜|어느|몇|어떠/;
+export function isProCon(q) {
+  if (typeof q !== 'string') return false;
+  const parts = q.trim().split(/(?<=[.?!])\s+/);
+  let k = parts.length - 1;
+  while (k > 0 && !/\?$/.test(parts[k]) && /(시오|십시오|세요)\.$/.test(parts[k]) && !WH.test(parts[k])) k--;
+  const last = parts[k];
+  if (!/(까|가)\?$/.test(last) || WH.test(last)) return false;
+  return !/(까|가),/.test(last);
+}

@@ -271,7 +271,7 @@ export default function App() {
   const setAnalysis = an => { setAnalysisState(an); if (remote.current) remote.current.putAnalysis(an); else saveJSON(ANALYSIS_KEY, an); };
   const updateEntry = (id, patch) => save(list => list.map(e => (e.id === id ? { ...e, ...patch } : e)));
   // Say why a generator fell back to its template text.
-  const onFallback = () => flash('이 주제로 저장된 문제가 아직 없어요 · ' + (lastAiIssue() || 'Claude 답변을 받지 못했어요. 다시 눌러 주세요.'));
+  const onFallback = msg => flash(msg || '이 주제로 저장된 문제가 아직 없어요 · ' + (lastAiIssue() || 'Claude 답변을 받지 못했어요. 다시 눌러 주세요.'));
 
   // Timer tick: prep → answer (one beep) → overtime (three beeps) until the answer is ended.
   useEffect(() => {
