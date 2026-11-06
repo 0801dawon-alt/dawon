@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { LAW_GUIDE, QUESTION_CRAFT, Q_STYLES } from '../lib/constants.js';
 import { ask, markUnreadable } from '../lib/ai.js';
 import { bankQuestions, valueTopicIds } from '../lib/bank.js';
@@ -7,15 +7,33 @@ import { ctx, fixQuestion, pad, parseJSON, track, uid } from '../lib/util.js';
 import { Rail } from './Chrome.jsx';
 import { ConfirmLink } from './Detail.jsx';
 import TopicPicker from './TopicPicker.jsx';
+import PERSONAL, { PERSONAL_GROUPS } from '../data/personality-questions.js';
 
 // One level: the question takes a clear stance point and, where it helps, a dilemma or current-affairs context.
 const GUIDE = '찬반이 갈리는 지점이나 두 가치가 충돌하는 딜레마를 짚어 지원자의 판단과 근거를 요구하는 질문. 필요하면 관련 시사 상식(주요 사회 현상, 수치·연도, 해외 사례)을 맥락으로 제시하되 법률 지식은 묻지 말 것';
-const COUNTS = [[1, '1개'], [2, '2개'], [3, '3개'], [5, '5개']];
+// Each press brings three new questions.
+const COUNT = 3;
+
+// Text that types itself in, one character at a time, after `delay` ms.
+function Typed({ text, delay = 0, onDone }) {
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const [n, setN] = useState(reduce ? text.length : 0);
+  useEffect(() => {
+    if (reduce) { onDone?.(); return undefined; }
+    setN(0);
+    let i = 0, timer;
+    const start = setTimeout(() => {
+      timer = setInterval(() => { i += 2; setN(Math.min(i, text.length)); if (i >= text.length) { clearInterval(timer); onDone?.(); } }, 22);
+    }, delay);
+    return () => { clearTimeout(start); clearInterval(timer); };
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <>{text.slice(0, n)}{n < text.length && <span className="type-caret" />}</>;
+}
 
 async function generate(e, qStyle, qCount, shown) {
   const QS = Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0];
   const avoid = (e.questions || []).map((q, i) => (i + 1) + '. ' + q).join('\n');
-  const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n[질문 방향] ${QS.k}: ${QS.g}\n아래 주제로 ${GUIDE} ${qCount}개를 만들어라.\n[필수 조건]\n- 실제 면접에 출제될 가능성이 높은, 찬반이 명확히 대립하거나 구체적 의견 제시를 요구하는 질문일 것.\n- 실제 로스쿨 기출처럼 생각을 여러 단계로 밀고 가게 하라: 원인 분석 → 입장과 근거 → 반대 입장의 가장 강한 논거에 대한 재반박 → 대안과 그 부작용. 한 질문 안에 이 가운데 두 단계 이상을 요구해도 된다(예: '~의 원인은 무엇이며, 지원자가 담당자라면 어떤 대안을 택하겠습니까? 그 대안의 부작용은 어떻게 줄일지도 답변해보시오.').\n- 단순 지식 확인, 막연한 '어떻게 생각하나요?' 식 질문 금지. 구체적 정책·제도·사례·수치·판례 등 맥락을 1문장 제시한 뒤 질문할 것(전체 2~3문장 허용).\n- 맥락이 실제 정책·법안·판결·사건·통계라면 실제로 존재하거나 논의·보도된 것만 쓰고, 가능하면 연도나 주체를 밝힐 것. 특정 기관이 실제로 하지 않은 일을 했다고 쓰지 말 것.\n- 사례를 만들어 써도 되며 가상이라고 밝힐 필요는 없지만, 한국의 현실과 맞아떨어져야 한다(실제로 있을 법한 상황·수치·제도 범위). '가령', '예를 들어'로 시작하는 가정 서술은 꼭 필요할 때만 쓴다.\n- 현실에 맞는 맥락이 마땅치 않으면 사례를 길게 풀지 말고, 대립 지점이 분명한 질문을 짧고 명료하게 던질 것.\n- 질문은 반드시 '~입니까?', '~하겠습니까?', '~생각합니까?' 등 '까?'로 끝나거나 '~답변해보시오.', '~제시해보시오.'로 끝낼 것.\n- 한 문장 안에서 지시형과 의문형을 섞지 말 것. '근거를 답변하고, 부작용은 어떻게 줄이겠습니까?'처럼 앞은 지시, 뒤는 질문인 문장은 어색하다. '근거를 밝히고, 부작용을 어떻게 줄일지 답변해보시오.' 또는 '근거는 무엇이며, 부작용은 어떻게 줄이겠습니까?'처럼 한 가지 방식으로 끝낸다.\n- 아래 기존 예상 질문과 쟁점·표현이 겹치지 않을 것:\n${avoid || '(없음)'}\n각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`));
+  const r = parseJSON(await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n[질문 방향] ${QS.k}: ${QS.g}\n아래 주제로 ${GUIDE} ${qCount}개를 만들어라.\n[필수 조건]\n- 실제 면접에 출제될 가능성이 높은, 찬반이 명확히 대립하거나 구체적 의견 제시를 요구하는 질문일 것.\n- 실제 로스쿨 기출처럼 생각을 여러 단계로 밀고 가게 하라: 원인 분석 → 입장과 근거 → 반대 입장의 가장 강한 논거에 대한 재반박 → 대안과 그 부작용. 한 질문 안에 이 가운데 두 단계 이상을 요구해도 된다(예: '~의 원인은 무엇이며, 지원자가 담당자라면 어떤 대안을 택하겠습니까? 그 대안의 부작용은 어떻게 줄일지도 답변해보시오.').\n- 단순 지식 확인, 막연한 '어떻게 생각하나요?' 식 질문 금지. 구체적 정책·제도·사례·수치 등 맥락과, 답하는 데 필요한 조건·정보를 먼저 제시한 뒤 날카롭게 물을 것. 질문 하나는 2~4문장, 화면에서 2~5줄 분량으로 쓸 것.\n- 맥락이 실제 정책·법안·판결·사건·통계라면 실제로 존재하거나 논의·보도된 것만 쓰고, 가능하면 연도나 주체를 밝힐 것. 특정 기관이 실제로 하지 않은 일을 했다고 쓰지 말 것.\n- 사례를 만들어 써도 되며 가상이라고 밝힐 필요는 없지만, 한국의 현실과 맞아떨어져야 한다(실제로 있을 법한 상황·수치·제도 범위). '가령', '예를 들어'로 시작하는 가정 서술은 꼭 필요할 때만 쓴다.\n- 현실에 맞는 맥락이 마땅치 않으면 사례를 길게 풀지 말고, 대립 지점이 분명한 질문을 짧고 명료하게 던질 것.\n- 질문은 '~입니까?', '~하겠습니까?' 같은 의문형이나 '~답변해보시오.', '~제시하시오.', '~입장을 밝히시오.' 같은 지시형으로 끝내되, 질문마다 끝맺음을 다양하게 할 것.\n- 한 문장 안에서 지시형과 의문형을 섞지 말 것. '근거를 답변하고, 부작용은 어떻게 줄이겠습니까?'처럼 앞은 지시, 뒤는 질문인 문장은 어색하다. '근거를 밝히고, 부작용을 어떻게 줄일지 답변해보시오.' 또는 '근거는 무엇이며, 부작용은 어떻게 줄이겠습니까?'처럼 한 가지 방식으로 끝낸다.\n- 아래 기존 예상 질문과 쟁점·표현이 겹치지 않을 것:\n${avoid || '(없음)'}\n각 질문마다 면접관의 의도를 한 문장으로. JSON 배열만 출력: [{"q":"질문","intent":"의도"}]\n\n${ctx(e)}`));
   const list = Array.isArray(r) ? r.filter(x => x && x.q).map(x => ({ ...x, q: fixQuestion(x.q) })) : null;
   if (list && list.length) return { list, ai: true };
   const fromBank = await bankQuestions(e, qCount, shown, qStyle);
@@ -35,7 +53,14 @@ function BoxRow({ label, options, value, onChange }) {
 
 const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, qList, setQList, myQuestions, saveMyQuestions, onPractice, onFallback }, ref) {
   const [qStyle, setQStyle] = useState(Q_STYLES[0].k);
-  const [qCount, setQCount] = useState(3);
+  const [kind, setKind] = useState('topic');
+  const [pGroup, setPGroup] = useState(PERSONAL_GROUPS[0]);
+  const [pSeen, setPSeen] = useState([]);
+  const [typed, setTyped] = useState(0);
+  const [open, setOpen] = useState(qList.length > 0);
+  // A new direction or topic starts from an empty arch, so one direction's questions never stand in for another's.
+  const first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } if (kind === 'topic') { setQList([]); setOpen(false); } }, [qStyle, topicId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loading, setLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualText, setManualText] = useState('');
@@ -53,12 +78,22 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
     const e = entries.find(x => x.id === topicId);
     if (!e || loading) return;
     setLoading(true);
-    const { list, ai } = await generate(e, qStyle, qCount, qList.map(x => x.q));
+    const { list, ai } = await generate(e, qStyle, COUNT, kind === 'topic' ? qList.map(x => x.q) : []);
     setLoading(false);
-    if (list.length) { setQList(list); setModelOpen(null); }
+    if (list.length) { show(list, 'topic'); }
     // Questions Claude wrote stay in the bank for later practice without AI.
     if (ai) list.forEach(x => addToUserBank({ k: 'q', t: e.id, st: qStyle, q: x.q, i: x.intent || '' }));
     if (!ai && !list.length) onFallback(!qStyle ? '' : qList.length ? `이 주제의 ‘${qStyle}’ 질문을 모두 보여 드렸어요 · 다른 주제나 질문 방향을 골라 보세요.` : `이 주제에는 ‘${qStyle}’ 질문이 아직 없어요 · 다른 질문 방향을 골라 보세요.`);
+  };
+  const show = (list, k) => { setKind(k); setTyped(0); setModelOpen(null); setQList(list); setOpen(false); setTimeout(() => setOpen(true), 40); };
+  const runPersonal = () => {
+    track('questions', '인성 질문');
+    const pool = PERSONAL.filter(x => x.g === pGroup);
+    let left = pool.filter(x => !pSeen.includes(x.q));
+    if (left.length < COUNT) { setPSeen(s0 => s0.filter(q => !pool.some(x => x.q === q))); left = pool; }
+    const pick = [...left].sort(() => Math.random() - 0.5).slice(0, COUNT);
+    setPSeen(s0 => [...s0, ...pick.map(x => x.q)]);
+    show(pick.map(x => ({ q: x.q, intent: '인성 질문 · ' + x.g, model: '' })), 'personal');
   };
   const addManual = () => {
     const q = manualText.trim(); if (!q) return;
@@ -90,7 +125,6 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
             <BoxRow label="질문 방향" options={Q_STYLES.map(t => [t.k, t.k])} value={qStyle} onChange={setQStyle} />
             <span style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', paddingLeft: 68 }}>{(Q_STYLES.find(x => x.k === qStyle) || Q_STYLES[0]).d}</span>
           </div>
-          <BoxRow label="개수" options={COUNTS} value={qCount} onChange={setQCount} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <button className="btn-accent" onClick={run}>{loading ? '생성 중…' : '질문 생성'} →</button>
@@ -105,26 +139,48 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
               </div>
             )}
           </div>
+          <div className="personal-box">
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 17 }}>인성 질문 만들기</span>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>지원 동기부터 갈등 경험까지 {PERSONAL.length}문항</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {PERSONAL_GROUPS.map(g => <button key={g} className={'box' + (g === pGroup ? ' on' : '')} onClick={() => setPGroup(g)}>{g}</button>)}
+            </div>
+            <button className="btn-line" style={{ alignSelf: 'flex-start', padding: '10px 16px', fontSize: 13 }} onClick={runPersonal}>인성 질문 뽑기 →</button>
+          </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          {qList.length === 0 && myQuestions.length === 0 && (
-            <div className="q-empty">
-              <div className="q-empty-arch" />
-              <span style={{ maxWidth: 300, wordBreak: 'keep-all' }}>생성된 질문이 여기에 쌓입니다. 질문 옆의 ‘연습’을 누르면 아래 타이머로 바로 넘어갑니다.</span>
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+            <div className="arch q-arch" style={{ width: open ? '100%' : 240, minHeight: open ? 460 : 250, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.22)' : 'none' }}>
+              {(!open || !qList.length) && (
+                <div className="arch-empty">
+                  <div style={{ fontFamily: 'var(--serif)', fontSize: 19, lineHeight: 1.45, whiteSpace: 'pre-line', textAlign: 'center' }}>{loading ? '질문을\n고르는 중…' : '아직 질문이\n없습니다'}</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{loading ? '잠시만 기다려주세요' : '‘질문 생성’이나\n‘인성 질문 뽑기’를 누르세요.'}</div>
+                </div>
+              )}
+              {open && qList.length > 0 && (
+                <div className="q-arch-body">
+                  <div className="q-arch-title">
+                    <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.18em', color: 'var(--muted)' }}>{kind === 'personal' ? '인성 질문 · ' + pGroup : '예상 질문 · ' + qStyle}</span>
+                    <h3 style={{ margin: 0, fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 'clamp(18px,2vw,23px)', letterSpacing: '-0.02em', wordBreak: 'keep-all' }}>{kind === 'personal' ? '지원자를 묻는 질문' : (entries.find(x => x.id === topicId) || {}).title}</h3>
+                  </div>
+                  {qList.map((x, i) => (
+                    <div key={kind + i + x.q.slice(0, 12)} className="q-item">
+                      <span className="mono" style={{ fontSize: 12, color: 'var(--muted-2)', paddingTop: 4 }}>{pad(i + 1)}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div className="q-item-q">{i <= typed ? <Typed text={x.q} delay={i === 0 ? 500 : 120} onDone={() => setTyped(t => Math.max(t, i + 1))} /> : ''}</div>
+                        {i < typed && <div className="q-item-intent fade-in">{x.intent || ''}</div>}
+                        {i < typed && x.model && <span className="link fade-in" style={{ fontSize: 12, color: 'var(--muted-2)', alignSelf: 'flex-start' }} onClick={() => setModelOpen(modelOpen === i ? null : i)}>{modelOpen === i ? '모범답안 접기' : '→ 모범답안'}</span>}
+                        {x.model && modelOpen === i && <div className="q-model">{x.model}</div>}
+                      </div>
+                      <button className="btn-practice-dark" style={{ opacity: i < typed ? 1 : 0, transition: 'opacity .4s' }} onClick={() => onPractice(x.q)}>연습 →</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          {qList.map((x, i) => (
-            <div key={i} className="q-item">
-              <span className="mono" style={{ fontSize: 12, color: 'var(--muted-2)', paddingTop: 4 }}>{pad(i + 1)}</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div className="q-item-q">{x.q}</div>
-                <div className="q-item-intent">{x.intent || ''}</div>
-                {x.model && <span className="link" style={{ fontSize: 12, color: 'var(--muted-2)', alignSelf: 'flex-start' }} onClick={() => setModelOpen(modelOpen === i ? null : i)}>{modelOpen === i ? '모범답안 접기' : '→ 모범답안'}</span>}
-                {x.model && modelOpen === i && <div className="q-model">{x.model}</div>}
-              </div>
-              <button className="btn-practice-dark" onClick={() => onPractice(x.q)}>연습 →</button>
-            </div>
-          ))}
+          </div>
           {myQuestions.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', marginTop: qList.length ? 28 : 0 }}>
               <span style={{ ...sub, paddingBottom: 6 }}>내가 입력한 질문 · {myQuestions.length}</span>

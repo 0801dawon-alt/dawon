@@ -267,7 +267,7 @@ button { font: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
 /* ── overlays ── */
 .overlay { position: fixed; inset: 0; display: flex; }
 .overlay-dim { position: absolute; inset: 0; background: rgba(20, 20, 20, 0.45); animation: tlFadeIn .3s ease both; }
-.detail { position: relative; width: calc(100% - clamp(56px, 9vw, 120px)); animation: tlSlideIn .42s cubic-bezier(.2, .8, .2, 1) both; box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.35); height: 100%; overflow-y: auto; background: var(--paper); display: flex; flex-direction: column; }
+.detail { position: relative; width: calc(100% - clamp(240px, 20vw, 300px)); animation: tlSlideIn .42s cubic-bezier(.2, .8, .2, 1) both; box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.35); height: 100%; overflow-y: auto; background: var(--paper); display: flex; flex-direction: column; }
 .detail-bar { position: sticky; top: 0; background: var(--paper); display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px clamp(20px, 4vw, 48px); border-bottom: 1px solid var(--line); z-index: 1; }
 .pill { font-size: 12px; padding: 5px 12px; border: 1px solid var(--muted-4); border-radius: 999px; }
 .pill-link { font-size: 12.5px; padding: 5px 11px; border: 1px solid var(--muted-4); border-radius: 999px; text-decoration: none; color: var(--ink); white-space: nowrap; }
@@ -402,3 +402,13 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .routed .passage-gap { gap: 12px !important; }
   .routed .site-footer { padding-block: 12px; height: 40px; align-items: center; overflow: hidden; }
 }
+
+/* Expected-question arch and typing */
+.q-arch-body { padding: clamp(150px, 20vw, 210px) clamp(20px, 4vw, 44px) clamp(24px, 4vw, 40px); display: flex; flex-direction: column; }
+.q-arch-title { position: absolute; left: 0; right: 0; top: clamp(60px, 9vw, 96px); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 0 16%; }
+.q-arch .q-item:last-child { border-bottom: none; }
+.type-caret { display: inline-block; width: 1px; height: 1em; margin-left: 2px; vertical-align: -0.12em; background: var(--wine, #8a2b3a); animation: tlCaret .8s steps(1) infinite; }
+@keyframes tlCaret { 50% { opacity: 0; } }
+.fade-in { animation: tlFade .5s ease both; }
+@keyframes tlFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.personal-box { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; padding: 20px 22px; border: 1px solid var(--line); background: var(--paper); }
