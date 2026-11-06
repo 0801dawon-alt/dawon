@@ -27,20 +27,22 @@ function keyPoints(model) {
 // Spoken Korean runs about 300 characters (spaces excluded) a minute.
 const CHARS_PER_MIN = 300;
 
-// Scoring rubric, written the way a law school oral-interview panel grades: six criteria with
-// unequal weights, five anchored levels each, and the total computed here from the parts.
+// Scoring rubric for any oral interview (university admission, law school, company), built from what
+// those panels share: understanding the question, logical thinking, concrete grounds and experience,
+// overall judgement, and communication. Six criteria with unequal weights, five anchored levels each,
+// and the total computed here from the parts.
 export const RUBRIC = [
-  { k: '쟁점 파악', max: 20, what: '질문이 실제로 묻는 것에 답했는가, 대립하는 가치·이해관계를 정확히 짚었는가',
-    levels: ['핵심 대립축을 스스로 명명하고 그 축 위에서 답을 전개', '핵심 쟁점은 잡았으나 대립 구도 설명이 얕음', '주제에는 답했으나 질문의 초점이 흐려지거나 일부만 답함', '질문을 넓게·다르게 해석해 초점에서 벗어남', '질문을 회피하거나 오해함'] },
-  { k: '입장 명확성', max: 10, what: '처음부터 분명한 결론을 내리고 끝까지 일관되게 유지했는가',
+  { k: '쟁점 파악', max: 20, what: '질문이나 제시문이 실제로 묻는 것을 정확히 이해하고, 핵심 쟁점·대립하는 가치를 짚었는가 (대입의 제시문 이해력·분석력, 로스쿨의 쟁점 파악)',
+    levels: ['질문의 핵심과 대립축을 스스로 짚고 그 위에서 답을 전개', '핵심은 잡았으나 쟁점 설명이 얕음', '주제에는 답했으나 질문의 초점이 흐려지거나 일부만 답함', '질문을 넓게·다르게 해석해 초점에서 벗어남', '질문을 회피하거나 잘못 이해함'] },
+  { k: '입장 명확성', max: 10, what: '처음부터 분명한 결론이나 답을 내고 끝까지 일관되게 유지했는가',
     levels: ['첫 문장에 결론, 조건과 범위까지 분명하고 끝까지 일관', '결론은 분명하나 뒤늦게 나오거나 범위가 모호', '입장은 있으나 양쪽을 오가며 흐려짐', '"둘 다 중요하다" 식으로 판단을 미룸', '입장이 없거나 앞뒤가 모순'] },
-  { k: '논증 타당성', max: 25, what: '근거에서 결론으로 가는 연결이 비약 없이 성립하는가, 판단 기준이 일관되는가',
+  { k: '논증 타당성', max: 25, what: '근거에서 결론으로 가는 연결이 비약 없이 성립하고, 판단 기준이 일관되는가 (논리적 사고력)',
     levels: ['근거마다 왜 결론을 지지하는지 설명되고 판단 기준이 하나로 일관', '대체로 타당하나 한 군데 연결이 약하거나 전제가 숨어 있음', '근거를 나열할 뿐 결론과의 연결 설명이 부족', '비약·순환논증·일반화 오류가 눈에 띔', '근거가 결론을 지지하지 못하거나 서로 충돌'] },
-  { k: '근거 구체성', max: 15, what: '주장마다 현실에 맞는 구체적 이유·사례·제도를 들었는가',
-    levels: ['현실과 맞는 구체적 사례·작동 방식으로 각 주장을 뒷받침', '구체적 근거가 있으나 일부 주장은 추상적', '상식적 이유는 있으나 대부분 일반론', '구호성 주장 위주로 근거가 거의 없음', '근거가 없거나 사실과 다름'] },
-  { k: '반론·대안', max: 15, what: '가장 강한 반대 논거를 제시하고 재반박했는가, 부작용을 고려한 현실적 대안이나 조건을 냈는가',
-    levels: ['가장 강한 반론을 정확히 세우고 재반박, 부작용까지 고려한 대안 제시', '반론과 재반박은 있으나 대안이나 부작용 검토가 얕음', '반론을 언급만 하고 넘어가거나 약한 반론만 다룸', '반대 입장을 왜곡하거나 무시함', '반론·대안 고려가 전혀 없음'] },
-  { k: '구조·전달', max: 15, what: '두괄식 구조, 단계 표시(첫째·둘째), 간결한 문장, 군말',
+  { k: '근거 구체성', max: 15, what: '주장마다 현실에 맞는 구체적 이유·사례·제도, 또는 지원자 자신의 경험을 들었는가 (인성·경험 질문은 구체적 상황·행동·결과)',
+    levels: ['구체적 사례·작동 방식·경험(상황-행동-결과)으로 각 주장을 뒷받침', '구체적 근거가 있으나 일부 주장은 추상적', '상식적 이유는 있으나 대부분 일반론', '구호성 주장 위주로 근거가 거의 없음', '근거가 없거나 사실과 다름'] },
+  { k: '반론·대안', max: 15, what: '반대 관점이나 한계를 고려해 재반박했는가, 부작용을 따진 현실적 대안이나 조건을 냈는가 (종합적 판단력·문제 해결력)',
+    levels: ['가장 강한 반론을 정확히 세우고 재반박, 부작용까지 고려한 대안 제시', '반론과 재반박은 있으나 대안이나 부작용 검토가 얕음', '반론을 언급만 하고 넘어가거나 약한 반론만 다룸', '반대 입장을 왜곡하거나 무시함', '반론·한계·대안 고려가 전혀 없음'] },
+  { k: '구조·전달', max: 15, what: '두괄식 구조, 단계 표시(첫째·둘째), 간결한 문장, 군말, 듣는 사람이 따라가기 쉬운가 (표현력·의사소통 능력)',
     levels: ['결론-근거-반론-마무리가 귀에 들리게 정리, 문장이 간결하고 군말 거의 없음', '구조는 보이나 일부 장황하거나 마무리가 약함', '구조가 흐릿해 요점을 따라가기 어려운 구간이 있음', '두서없이 이어지고 반복·군말이 잦음', '구조가 없어 요점을 알아듣기 어려움'] },
 ];
 const LEVELS = ['상', '중상', '중', '중하', '하'];
@@ -68,7 +70,7 @@ async function evaluate(at, text, entry, history = []) {
   const limit = at.limit || 120, target = Math.round(limit / 60 * CHARS_PER_MIN);
   const withPassage = !!at.context;
   const fillerN = Object.values(fl).reduce((a, b) => a + b, 0);
-  let fb = parseJSON(await ask(`너는 한국 로스쿨 구술면접에 여러 해 들어간 법학 교수이자 평가위원이다.\n${LAW_GUIDE}
+  let fb = parseJSON(await ask(`너는 대학 입시, 로스쿨, 기업 면접에서 여러 해 구술면접 평가위원을 맡아 온 사람이다. 질문의 성격(시사·가치 판단, 제시문, 인성·경험)에 맞춰 평가하되, 아래 기준표를 그대로 적용하라.\n${LAW_GUIDE}
 아래는 지원자의 실제 답변을 음성 인식으로 전사한 것이다(띄어쓰기·맞춤법 같은 인식 오류는 감점하지 마라). 아래 평가 기준표를 그대로 적용해 채점하라.
 [질문] ${at.q}
 ${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[군말] ${fillerN}회
@@ -76,7 +78,7 @@ ${withPassage ? '[제시문]\n' + at.context.slice(0, 4000) + '\n' : ''}[군말]
 ${text}
 ${entry ? '[참고 쟁점] ' + (entry.issues || []).join(' / ') : ''}
 ${hist.text ? hist.text + '\n이 기록과 비교해, 반복된 약점이 이번 답변에서 고쳐졌는지 그대로인지 progress에 구체적으로 쓰고(점수는 이번 답변만으로 매긴다), 다음 연습에서 가장 먼저 고칠 한 가지를 focus에 쓴다.\n' : ''}
-[평가 기준표 · 100점]
+[구술면접 채점기준표 · 100점]
 ${rubricText}
 
 [채점 절차]
@@ -135,7 +137,7 @@ JSON만 출력: {"criteria":[{"name":"쟁점 파악","level":"상|중상|중|중
 
 async function nextFollowup(at, prev) {
   const fb = at.fb || {};
-  let q = await ask(`너는 한국 로스쿨 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n지원자의 답변을 듣고 실제 면접처럼 꼬리질문 1개를 던져라. 답변의 전제나 기준을 흔들거나, 약한 근거를 파고들거나, 반대 입장의 논거로 재반박을 요구하거나, 두 가치가 충돌할 때의 판단 기준을 묻거나, 제시한 대안의 부작용과 실현 가능성을 따지는 방식 중 가장 효과적인 것을 고른다. 법률 지식(조문·판례·법리·법률 용어)을 묻지 않는다. 답변에 실제로 나온 표현을 짚어서 구체적으로 묻고, 필요하면 2문장까지 쓴다. '~입니까?' 또는 '~답변해보시오.'로 끝낸다. 이전 꼬리질문과 겹치지 않게 한다. 실제 제도·사건·통계를 언급할 때는 실제로 있는 것만 쓰고, 사례를 만들 때는 현실과 맞아떨어지게 쓴다. '가령'으로 시작하는 가정은 꼭 필요할 때만 쓰고, 마땅치 않으면 짧고 명료하게 묻는다. 질문 문장만 출력.\n[원 질문] ${at.q}\n[답변] ${(at.text || '').slice(0, 2500)}\n${fb.weaknesses ? '[평가상 약점] ' + fb.weaknesses.join(' / ') : ''}\n${prev.length ? '[이전 꼬리질문] ' + prev.join(' / ') : ''}`);
+  let q = await ask(`너는 대학 입시, 로스쿨, 기업 면접에 들어가는 구술면접 면접위원이다.\n${LAW_GUIDE}\n${QUESTION_CRAFT}\n지원자의 답변을 듣고 실제 면접처럼 꼬리질문 1개를 던져라. 답변의 전제나 기준을 흔들거나, 약한 근거를 파고들거나, 반대 입장의 논거로 재반박을 요구하거나, 두 가치가 충돌할 때의 판단 기준을 묻거나, 제시한 대안의 부작용과 실현 가능성을 따지는 방식 중 가장 효과적인 것을 고른다. 법률 지식(조문·판례·법리·법률 용어)을 묻지 않는다. 답변에 실제로 나온 표현을 짚어서 구체적으로 묻고, 필요하면 2문장까지 쓴다. '~입니까?' 또는 '~답변해보시오.'로 끝낸다. 이전 꼬리질문과 겹치지 않게 한다. 실제 제도·사건·통계를 언급할 때는 실제로 있는 것만 쓰고, 사례를 만들 때는 현실과 맞아떨어지게 쓴다. '가령'으로 시작하는 가정은 꼭 필요할 때만 쓰고, 마땅치 않으면 짧고 명료하게 묻는다. 질문 문장만 출력.\n[원 질문] ${at.q}\n[답변] ${(at.text || '').slice(0, 2500)}\n${fb.weaknesses ? '[평가상 약점] ' + fb.weaknesses.join(' / ') : ''}\n${prev.length ? '[이전 꼬리질문] ' + prev.join(' / ') : ''}`);
   q = (q || '').trim().replace(/^["'“]|["'”]$/g, '');
   return q || FALLBACK_FOLLOWUPS.find(x => !prev.includes(x)) || FALLBACK_FOLLOWUPS[0];
 }
@@ -144,7 +146,7 @@ async function nextFollowup(at, prev) {
 const IN_ARTIFACT = inArtifact();
 // The site owner's homepage keeps the copy-to-my-Claude-page flow; visitors (who cannot open that private page) get a self-contained prompt for their own Claude.
 const OWNER = !IN_ARTIFACT && (() => { try { if (/[?&]owner=1/.test(window.location.search)) localStorage.setItem('thoughtlib_owner', '1'); return localStorage.getItem('thoughtlib_owner') === '1'; } catch { return false; } })();
-const claudePrompt = (q, text, context) => `너는 한국 로스쿨 구술면접 평가위원이다. 아래 지원자 답변을 평가 기준표(6개 항목, 100점)로 채점해 줘. 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 쓰고, 잘한 점, 고칠 점(어떤 문장을 어떻게 바꿀지), 실제 면접처럼 꼬리질문 1개, 그리고 모범답안을 써 줘. 실제 지원자 평균은 60점대라고 보고 후하게 주지 마.\n\n[평가 기준표]\n${rubricText}\n\n[질문] ${q}\n${context ? '[제시문]\n' + context.slice(0, 4000) + '\n' : ''}[답변]\n${text}`;
+const claudePrompt = (q, text, context) => `너는 대학 입시, 로스쿨, 기업 면접의 구술면접 평가위원이다. 아래 지원자 답변을 구술면접 채점기준표(6개 항목, 100점)로 채점해 줘. 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 쓰고, 잘한 점, 고칠 점(어떤 문장을 어떻게 바꿀지), 실제 면접처럼 꼬리질문 1개, 그리고 모범답안을 써 줘. 실제 지원자 평균은 60점대라고 보고 후하게 주지 마.\n\n[평가 기준표]\n${rubricText}\n\n[질문] ${q}\n${context ? '[제시문]\n' + context.slice(0, 4000) + '\n' : ''}[답변]\n${text}`;
 const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
 const DICTATION_TIP = TOUCH ? ' 키보드의 마이크 버튼을 누르고 말하면 받아 적혀요.'
@@ -418,8 +420,8 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
             )}
             {!fb && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--muted-3)' }}>답변이 끝나면 로스쿨 구술면접 평가 기준표(6개 항목 · 100점)로 채점하고, 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 보여 줍니다.</div>
-                <span className="link" style={{ fontSize: 12.5, color: 'var(--muted-3)', alignSelf: 'flex-start' }} onClick={() => setRubricOpen(!rubricOpen)}>{rubricOpen ? '평가 기준 닫기' : '평가 기준 보기'}</span>
+                <div style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--muted-3)' }}>답변이 끝나면 구술면접 채점기준표(6개 항목 · 100점)로 채점하고, 항목마다 답변의 어느 표현을 근거로 몇 점을 줬는지 보여 줍니다.</div>
+                <span className="link" style={{ fontSize: 12.5, color: 'var(--muted-3)', alignSelf: 'flex-start' }} onClick={() => setRubricOpen(!rubricOpen)}>{rubricOpen ? '채점기준표 닫기' : '구술면접 채점기준표 보기'}</span>
                 {rubricOpen && <RubricTable />}
               </div>
             )}
@@ -429,7 +431,7 @@ export const Record = forwardRef(function Record({ timer, question, setQuestion,
                   <span style={{ fontFamily: 'var(--sans)', fontWeight: 200, fontSize: 64, lineHeight: 1, letterSpacing: '-0.04em' }}>{fb.total}</span>
                   <span style={{ ...darkLabel, fontSize: 12 }}>/ 100</span>
                   <span style={{ fontSize: 13, color: '#e9e6dd' }}>{fb.grade || gradeOf(fb.total)}</span>
-                  <span className="link" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted-3)' }} onClick={() => setRubricOpen(!rubricOpen)}>{rubricOpen ? '평가 기준 닫기' : '평가 기준 보기'}</span>
+                  <span className="link" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted-3)' }} onClick={() => setRubricOpen(!rubricOpen)}>{rubricOpen ? '채점기준표 닫기' : '구술면접 채점기준표 보기'}</span>
                 </div>
                 {rubricOpen && <RubricTable />}
                 <div style={{ fontSize: 14.5, lineHeight: 1.75 }}>{fb.summary}</div>
