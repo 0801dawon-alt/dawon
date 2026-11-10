@@ -150,8 +150,8 @@ const Questions = forwardRef(function Questions({ entries, topicId, setTopicId, 
             <button className="btn-line" style={{ alignSelf: 'flex-start', padding: '10px 16px', fontSize: 13 }} onClick={runPersonal}>인성 질문 뽑기 →</button>
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+        <div className="q-arch-col" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignSelf: 'stretch', minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
             <div className="arch q-arch" style={{ width: open ? '100%' : 240, minHeight: open ? 460 : 250, borderRadius: '9999px 9999px 0 0', boxShadow: open ? '0 40px 80px -40px rgba(0,0,0,0.22)' : 'none' }}>
               {(!open || !qList.length) && (
                 <div className="arch-empty">
