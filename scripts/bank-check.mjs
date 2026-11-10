@@ -31,7 +31,7 @@ let passages = 0;
 for (const f of fs.readdirSync(BANK).sort()) {
   const src = fs.readFileSync(path.join(BANK, f), 'utf8');
   if (f.startsWith('q-')) await import('data:text/javascript,' + encodeURIComponent(src.replace(/^import .*$/m, 'const M=globalThis.__M;')));
-  else passages += (await import(path.join(BANK, f))).default.filter(x => x.k === 'p').length;
+  else if (!f.startsWith('m-')) passages += (await import(path.join(BANK, f))).default.filter(x => x.k === 'p').length;
 }
 const missing = all.filter(e => (e.questions || []).some((q, n) => !covered.has(e.id + '#' + n)));
 const show = list => list.forEach(e => { console.log(`## ${e.id} [${e.category}] ${e.title} — ${e.summary}`); (e.questions || []).forEach((q, i) => console.log(`${i}. ${q}`)); });

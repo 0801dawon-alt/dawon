@@ -12,12 +12,18 @@ if (typeof window !== 'undefined') window.addEventListener('tl-userbank', () => 
 export function loadBank() {
   if (!bankPromise) {
     bankPromise = Promise.all([...Object.values(FILES).map(load => load().then(m => m.default || [], () => [])), Promise.resolve(localUserBank()), sharedUserBank()]).then(parts => {
-      const qs = [], ps = [], models = new Map();
+      const qs = [], ps = [], models = new Map(), answers = [];
       parts.flat().forEach(x => {
-        if (x.k === 'p') { if (!ps.some(p => p.id === x.id)) ps.push(x); }
+        if (x.k === 'a') answers.push(x);
+        else if (x.k === 'p') { if (!ps.some(p => p.id === x.id)) ps.push(x); }
         else if (x.q) { qs.push(x); if (x.m) models.set(norm(x.q), x.m); }
       });
       ps.forEach(p => (p.qs || []).forEach((q, i) => { if (p.ms && p.ms[i]) models.set(norm(q), p.ms[i]); }));
+      // Answers written later for bank questions, matched by topic and the question's opening words.
+      answers.forEach(a => {
+        const q = qs.find(x => x.t === a.t && !x.m && norm(x.q).startsWith(norm(a.h)));
+        if (q) { q.m = a.m; models.set(norm(q.q), a.m); }
+      });
       return { qs, ps, models };
     });
   }
