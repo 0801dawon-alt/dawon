@@ -9,6 +9,7 @@ import { Footer, Header, Intro, TabBar, Toast } from './components/Chrome.jsx';
 import Home from './components/Home.jsx';
 import Library from './components/Library.jsx';
 import { DetailPanel, EntryForm } from './components/Detail.jsx';
+import { useSwipeBack } from './lib/swipeBack.js';
 import Questions from './components/Questions.jsx';
 import Passage from './components/Passage.jsx';
 import Timer, { MiniTimer } from './components/Timer.jsx';
@@ -98,15 +99,17 @@ export default function App() {
     return { section: m[1], tab: MOCK.includes(m[2]) ? m[2] : 'questions' };
   };
   const [route, setRoute] = useState(readRoute);
+  const depth = useRef(0); // pages this visit moved forward through, so a back swipe never leaves the site
   useEffect(() => {
     const on = () => { const r = readRoute(); if (r.section === 'mock') pendingTab.current = { tab: r.tab, smooth: false }; setRoute(r); };
-    window.addEventListener('popstate', on); window.addEventListener('hashchange', on);
-    return () => { window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
+    const pop = () => { depth.current = Math.max(0, depth.current - 1); };
+    window.addEventListener('popstate', pop); window.addEventListener('popstate', on); window.addEventListener('hashchange', on);
+    return () => { window.removeEventListener('popstate', pop); window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const nav = (section, tab) => {
     const next = { section, tab: tab || (section === 'mock' ? route.tab : route.tab) };
     const hash = section === 'home' ? '#/' : section === 'library' ? '#/library' : '#/mock/' + next.tab;
-    if (location.hash !== hash) history.pushState(null, '', location.pathname + location.search + hash);
+    if (location.hash !== hash) { history.pushState(null, '', location.pathname + location.search + hash); depth.current += 1; }
     const within = route.section === 'mock' && section === 'mock';
     setRoute(next);
     // Inside the mock-interview page every step sits on one long page: move to that step's screen.
@@ -437,6 +440,14 @@ export default function App() {
   };
 
 
+  // Phone back swipe: closes the open panel first, then steps back through the pages visited.
+  useSwipeBack(() => {
+    if (form) return setForm(null);
+    if (settingsOpen) return setSettingsOpen(false);
+    if (openId) return setOpenId(null);
+    if (depth.current > 0) return history.back();
+    if (route.section !== 'home') { history.replaceState(null, '', location.pathname + location.search + '#/'); setRoute({ section: 'home', tab: 'questions' }); window.scrollTo(0, 0); }
+  });
   const show = (sec, tab) => route.section === sec && (!tab || sec === 'mock' || route.tab === tab);
   const STEPS = [['questions', '예상 질문'], ['passage', '제시문'], ['practice', '타이머'], ['answer', '답변 기록'], ['records', '내 기록']];
   const panel = key => ({ ref: panelRefs[key], 'data-panel': key, className: 'mock-panel' + (activePanel === key ? ' active' : '') });
