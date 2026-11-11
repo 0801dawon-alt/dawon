@@ -171,10 +171,14 @@ export function DetailPanel({ entry: od, restructuring, onClose, onRestructure, 
             <span style={{ width: 8, height: 8, background: NEUTRAL }} />{od.category}
           </span>
           <div style={{ display: 'flex', gap: 16, fontSize: 13, alignItems: 'center' }}>
-            <span className="link" onClick={onRestructure}>{restructuring ? '재구성 중…' : 'AI 재구성'}</span>
-            <span className="link" onClick={onEdit}>편집</span>
-            <ConfirmLink label="삭제" armedLabel="한 번 더 누르면 삭제" onConfirm={onDelete} />
-            <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 22, lineHeight: 1 }}>×</span>
+            {/* Editing tools are for the owner's claude.ai page; the public site only gets the close button. */}
+            {inArtifact() && <>
+              <span className="link" onClick={onRestructure}>{restructuring ? '재구성 중…' : 'AI 재구성'}</span>
+              <span className="link" onClick={onEdit}>편집</span>
+              <ConfirmLink label="삭제" armedLabel="한 번 더 누르면 삭제" onConfirm={onDelete} />
+            </>}
+            <button type="button" aria-label="닫고 목록으로" onClick={onClose}
+              style={{ cursor: 'pointer', fontSize: inArtifact() ? 26 : 34, lineHeight: 1, width: 44, height: 44, margin: '-10px -12px -10px 0', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 0, padding: 0, color: 'inherit', fontFamily: 'inherit' }}>×</button>
           </div>
         </div>
         <div className="detail-body" style={{ padding: 'clamp(28px,5vw,56px) clamp(20px,4vw,56px)', display: 'flex', flexDirection: 'column', gap: 40 }}>
