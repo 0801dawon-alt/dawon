@@ -1,5 +1,5 @@
-// Phones: dragging from the left edge slides the current screen (or the open panel) to the right,
-// like the iPhone back gesture, and going past a third of the width goes back one step.
+// iPhone home-screen app: dragging from the left edge slides the current screen (or the open panel)
+// to the right, like Safari's back gesture, and going past a third of the width goes back one step.
 import { useEffect, useRef } from 'react';
 
 const EDGE = 28;
@@ -8,6 +8,11 @@ export function useSwipeBack(onBack) {
   const cb = useRef(onBack); cb.current = onBack;
   useEffect(() => {
     if (typeof window === 'undefined' || !('ontouchstart' in window)) return undefined;
+    // Safari and Android browsers already have their own back gesture or button, which follows the
+    // history entries the app adds, so this drag is only for the iPhone home-screen app, which has none.
+    const ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    const standalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (!ios || !standalone) return undefined;
     let s = null;
     const target = () => {
       const ov = document.querySelectorAll('.overlay');

@@ -64,11 +64,37 @@ export default function App() {
   const [cat, setCatState] = useState('전체');
   const [search, setSearchState] = useState('');
   const [page, setPageState] = useState(0);
-  const [openId, setOpenId] = useState(null);
-  const [form, setForm] = useState(null);
+  const [openId, setOpenIdRaw] = useState(null);
+  const [form, setFormRaw] = useState(null);
   const [uploading, setUploading] = useState(0);
   const [restructuring, setRestructuring] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpenRaw] = useState(false);
+  // Panels that cover the page (a topic, the edit form, settings) each get their own history entry,
+  // so the phone's back swipe or back button closes just the top panel and lands on the screen right behind it.
+  const layers = useRef([]); // names of the panels opened through history, bottom to top
+  const raw = { topic: setOpenIdRaw, form: setFormRaw, settings: setSettingsOpenRaw };
+  const openLayer = name => {
+    if (layers.current.includes(name)) return;
+    layers.current = [...layers.current, name];
+    history.pushState({ layer: layers.current.length }, '', location.href);
+  };
+  const skipPops = useRef(0); // history steps we started ourselves after closing a panel from its own button
+  const afterPop = useRef([]); // page moves waiting until that step has finished
+  const closeLayer = name => {
+    const i = layers.current.lastIndexOf(name);
+    const gone = i < 0 ? [name] : layers.current.slice(i);
+    gone.forEach(n => raw[n](n === 'settings' ? false : null));
+    if (i < 0) return;
+    layers.current = layers.current.slice(0, i);
+    skipPops.current += 1;
+    history.go(-gone.length); // drop the panel's history entries so back goes to the screen behind
+  };
+  const setOpenId = v => { if (v == null) closeLayer('topic'); else { openLayer('topic'); setOpenIdRaw(v); } };
+  const setForm = v => {
+    if (typeof v === 'function') return setFormRaw(v);
+    if (v == null) closeLayer('form'); else { openLayer('form'); setFormRaw(v); }
+  };
+  const setSettingsOpen = v => { if (!v) closeLayer('settings'); else { openLayer('settings'); setSettingsOpenRaw(true); } };
   const [bookOpen, setBookOpen] = useState(false);
   const [aiOn, setAiOn] = useState(hasApiKey);
   useEffect(() => { const id = setTimeout(() => setAiOn(hasApiKey()), 1500); return () => clearTimeout(id); }, []);
@@ -102,14 +128,29 @@ export default function App() {
   const depth = useRef(0); // pages this visit moved forward through, so a back swipe never leaves the site
   useEffect(() => {
     const on = () => { const r = readRoute(); if (r.section === 'mock') pendingTab.current = { tab: r.tab, smooth: false }; setRoute(r); };
-    const pop = () => { depth.current = Math.max(0, depth.current - 1); };
-    window.addEventListener('popstate', pop); window.addEventListener('popstate', on); window.addEventListener('hashchange', on);
-    return () => { window.removeEventListener('popstate', pop); window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
+    const pop = e => {
+      if (skipPops.current > 0) {
+        skipPops.current -= 1;
+        const q = afterPop.current; afterPop.current = []; q.forEach(f => f());
+        return;
+      }
+      const keep = (e.state && e.state.layer) || 0;
+      if (layers.current.length > keep) { // stepped back out of one or more panels: close them, stay on this page
+        layers.current.slice(keep).forEach(n => raw[n](n === 'settings' ? false : null));
+        layers.current = layers.current.slice(0, keep);
+        return;
+      }
+      depth.current = Math.max(0, depth.current - 1); on();
+    };
+    window.addEventListener('popstate', pop); window.addEventListener('hashchange', on);
+    return () => { window.removeEventListener('popstate', pop); window.removeEventListener('hashchange', on); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const nav = (section, tab) => {
     const next = { section, tab: tab || (section === 'mock' ? route.tab : route.tab) };
     const hash = section === 'home' ? '#/' : section === 'library' ? '#/library' : '#/mock/' + next.tab;
-    if (location.hash !== hash) { history.pushState(null, '', location.pathname + location.search + hash); depth.current += 1; }
+    if (layers.current.length) { layers.current.forEach(n => raw[n](n === 'settings' ? false : null)); layers.current = []; }
+    const push = () => { if (location.hash !== hash) { history.pushState(null, '', location.pathname + location.search + hash); depth.current += 1; } };
+    if (skipPops.current > 0) afterPop.current.push(push); else push();
     const within = route.section === 'mock' && section === 'mock';
     setRoute(next);
     // Inside the mock-interview page every step sits on one long page: move to that step's screen.
@@ -147,7 +188,7 @@ export default function App() {
       if (Date.now() < spyLock.current) return;
       setRoute(r => (r.section === 'mock' && r.tab !== tab ? { ...r, tab } : r));
       const hash = '#/mock/' + tab;
-      if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
+      if (location.hash !== hash) history.replaceState(history.state, '', location.pathname + location.search + hash);
     }, { threshold: [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1] });
     Object.values(panelRefs).forEach(r => r.current && io.observe(r.current));
     return () => { io.disconnect(); document.documentElement.classList.remove('snap-on'); };
@@ -442,10 +483,10 @@ export default function App() {
 
   // Phone back swipe: closes the open panel first, then steps back through the pages visited.
   useSwipeBack(() => {
+    if (layers.current.length || depth.current > 0) return history.back();
     if (form) return setForm(null);
     if (settingsOpen) return setSettingsOpen(false);
     if (openId) return setOpenId(null);
-    if (depth.current > 0) return history.back();
     if (route.section !== 'home') { history.replaceState(null, '', location.pathname + location.search + '#/'); setRoute({ section: 'home', tab: 'questions' }); window.scrollTo(0, 0); }
   });
   const show = (sec, tab) => route.section === sec && (!tab || sec === 'mock' || route.tab === tab);
