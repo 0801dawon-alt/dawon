@@ -250,10 +250,10 @@ export default function CnuRoom({ onBack }) {
     const token = ++s.token; s.pos = pos;
     timer.stop(); setView({ mode: s.mode, pos });
     if (!st) { stopAll('wait'); return; }
-    if (st.t === 'say') audio.play(st.key, () => { if (sess.current.token === token && !sess.current.paused) exec(pos + 1); });
     // Fetch the next clip while this one plays, so turns follow each other without a gap.
     const nx = s.steps.slice(pos + 1).find(x => x.t === 'say');
     if (nx && typeof Audio !== 'undefined') { const pre = new Audio(); pre.preload = 'auto'; pre.src = BASE + nx.key + '.mp3'; preRef.current = pre; }
+    if (st.t === 'say') audio.play(st.key, () => { if (sess.current.token === token && !sess.current.paused) exec(pos + 1); });
     else if (st.t === 'user') {
       audio.stop();
       if (st.auto) timer.start(st.limit, () => finish(token));
