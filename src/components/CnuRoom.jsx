@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SETS, CYC2, SCRIPTS, FINAL_TYPES, PERSONAL, CLOSING, PRACTICE, OTHER_NO } from '../data/cnu/index.js';
+import { SETS, CYC2, CYC3, SCRIPTS, FINAL_TYPES, PERSONAL, CLOSING, PRACTICE } from '../data/cnu/index.js';
 import AUDIO from '../data/cnu/audio.json';
 import './cnu-room.css';
 
 const BASE = (import.meta.env.BASE_URL || './') + 'cnu-audio/';
-const STORE = 'tl-cnu-room-v2', THEME = 'tl-cnu-theme', SPEED = 'tl-cnu-speed';
+const STORE = 'tl-cnu-room-v3', SPEED = 'tl-cnu-speed';
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage off */ } };
 const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
@@ -15,44 +15,54 @@ const BY_ID = Object.fromEntries(SETS.flat().map(q => [q.id, q]));
 const TYPE_LABEL = { 찬반: '찬반형', 견해: '견해 제시형', 해결: '해결방안 제시형' };
 const PHASE = { wait: '면접 대기실', r1: '1차 발언', r2: '2차 발언', fin: '마지막 1분', end: '면접 종료', solo: '개별 연습' };
 const WHO = { j1: '면접위원 1', j2: '면접위원 2', j3: '면접위원 3' };
-const whoName = w => WHO[w] || `지원자 ${w}`;
+const whoName = (w, me) => WHO[w] || `지원자 ${w}${w === me ? '(나)' : ''}`;
 
-// 문항 배정: 가상 지원자 좌석(1·3·4·5)에는 그 좌석 목소리로 만든 답변이 있는 문항을, 남은 하나는 내 자리(2번)에.
-function makeAssign(set) {
+// 문항 배정: 내 자리 번호를 먼저 무작위로 뽑고, 나머지 네 자리에는 가상 지원자 목소리(1·3·4·5)마다
+// 그 목소리로 만든 답변이 있는 문항을 하나씩, 남은 문항은 내 자리에 둔다. 면접을 시작할 때마다 새로 뽑는다.
+function makeAssign(set, me = 1 + Math.floor(Math.random() * 5)) {
   const pos = Array(5).fill(null), left = [...set];
-  shuffle([1, 3, 4, 5]).forEach(p => {
-    const c = left.filter(q => q.v === p);
+  const seats = shuffle([1, 2, 3, 4, 5].filter(n => n !== me));
+  shuffle([1, 3, 4, 5]).forEach((v, i) => {
+    const c = left.filter(q => q.v === v);
     const q = c.length ? pick(c) : pick(left);
-    pos[p - 1] = q.id; left.splice(left.indexOf(q), 1);
+    pos[seats[i] - 1] = q.id; left.splice(left.indexOf(q), 1);
   });
-  pos[1] = left[0].id;
-  return pos;
+  pos[me - 1] = left[0].id;
+  return { me, pos };
 }
 
 function loadStore() {
   const s = read(STORE, null);
-  if (s && Array.isArray(s.opened) && s.opened.every(i => SETS[i]) && s.cur != null && s.assign && s.assign[s.cur] && s.assign[s.cur].length === 5) return s;
+  if (s && Array.isArray(s.opened) && s.opened.every(i => SETS[i]) && s.cur != null && s.assign && s.assign[s.cur] && (s.assign[s.cur].pos || []).length === 5) return s;
   const i = Math.floor(Math.random() * SETS.length);
   const n = { opened: [i], cur: i, assign: { [i]: makeAssign(SETS[i]) }, done: [] };
   write(STORE, n); return n;
 }
 
-// 전체면접 진행표. say = 음성 재생 후 자동으로 다음, user = 지원자 2의 직접 발언.
-function buildSteps(setIdx, assign) {
-  const q = p => BY_ID[assign[p - 1]];
+const voiceOf = (pos, n) => BY_ID[pos[n - 1]].v;
+const seatWithVoice = (pos, me, v) => [1, 2, 3, 4, 5].find(n => n !== me && voiceOf(pos, n) === v);
+
+// 전체면접 진행표. say = 음성 재생 후 자동으로 다음, user = 내 직접 발언.
+function buildSteps(setIdx, { pos, me }) {
+  const q = p => BY_ID[pos[p - 1]];
+  const vo = n => voiceOf(pos, n);
   const S = [], say = (who, key, text, o = {}) => S.push({ t: 'say', who, key, text, ...o });
   say('j1', 'sc-intro', SCRIPTS.intro, { ph: 'r1', turn: true, sp: 'j1' });
   for (let n = 1; n <= 5; n++) {
     const o = { ph: 'r1', sp: n, qno: n };
     say('j1', `sc-c1-${n}`, SCRIPTS[`c1-${n}`], { ...o, turn: true });
-    if (n === 2) { say('j1', q(2).id + '-q', q(2).q, o); S.push({ t: 'user', ...o, limit: 120, auto: true }); }
+    if (n === me) { say('j1', q(n).id + '-q', q(n).q, o); S.push({ t: 'user', ...o, limit: 120, auto: true }); }
     else say(n, q(n).id + '-m1', q(n).m1, o);
   }
   say('j1', 'sc-r2', SCRIPTS.r2, { ph: 'r2', turn: true, sp: 'j1' });
   for (let n = 1; n <= 5; n++) {
     say('j1', `sc-c2-${n}`, SCRIPTS[`c2-${n}`], { ph: 'r2', sp: n, turn: true });
-    if (n === 2) S.push({ t: 'user', ph: 'r2', sp: 2, limit: 120, auto: false, draw: true });
-    else { const t = +Object.keys(CYC2).find(k => CYC2[k] === n); say(n, q(t).id + '-m2', q(t).m2, { ph: 'r2', sp: n, qno: t, target: t }); }
+    if (n === me) S.push({ t: 'user', ph: 'r2', sp: n, limit: 120, auto: false, draw: true });
+    else {
+      // 가상 지원자는 자기 목소리로 2차 응답이 만들어진 문항(다른 가상 지원자의 1차 답변)에 응답한다.
+      const v = +Object.keys(CYC2).find(k => CYC2[k] === vo(n)), t = seatWithVoice(pos, me, v);
+      say(n, q(t).id + '-m2', q(t).m2, { ph: 'r2', sp: n, qno: t, target: t });
+    }
   }
   const [ft] = FINAL_TYPES[setIdx % 3];
   const k = Math.floor(setIdx / 3) % 4;
@@ -62,22 +72,27 @@ function buildSteps(setIdx, assign) {
     say('j3', `pq-${k}`, PERSONAL[k].q, { ph: 'fin', sp: 'j3' });
     order.forEach(n => {
       say('j1', `sc-cf-${n}`, SCRIPTS[`cf-${n}`], { ph: 'fin', sp: n, turn: true });
-      if (n === 2) { say('j3', `pq-${k}`, PERSONAL[k].q, { ph: 'fin', sp: 2 }); S.push({ t: 'user', ph: 'fin', sp: 2, limit: 60, auto: false, tag: '인성질문', prompt: PERSONAL[k].q, replay: [`pq-${k}`, 'j3', PERSONAL[k].q] }); }
-      else say(n, `pa-${k}-${n}`, PERSONAL[k].a[n], { ph: 'fin', sp: n });
+      if (n === me) { say('j3', `pq-${k}`, PERSONAL[k].q, { ph: 'fin', sp: n }); S.push({ t: 'user', ph: 'fin', sp: n, limit: 60, auto: false, tag: '인성질문', prompt: PERSONAL[k].q, replay: [`pq-${k}`, 'j3', PERSONAL[k].q] }); }
+      else say(n, `pa-${k}-${vo(n)}`, PERSONAL[k].a[vo(n)], { ph: 'fin', sp: n });
     });
   } else if (ft === 'B') {
     say('j1', 'sc-fB', SCRIPTS.fB, { ph: 'fin', turn: true, sp: 'j1' });
     order.forEach(n => {
       say('j1', `sc-cf-${n}`, SCRIPTS[`cf-${n}`], { ph: 'fin', sp: n, turn: true });
-      if (n === 2) { say('j1', 'sc-lastq', SCRIPTS.lastq, { ph: 'fin', sp: 2 }); S.push({ t: 'user', ph: 'fin', sp: 2, limit: 60, auto: false, tag: '마지막으로 하고 싶은 말', prompt: SCRIPTS.lastq, replay: ['sc-lastq', 'j1', SCRIPTS.lastq] }); }
-      else say(n, `la-${k}-${n}`, CLOSING[k][n], { ph: 'fin', sp: n });
+      if (n === me) { say('j1', 'sc-lastq', SCRIPTS.lastq, { ph: 'fin', sp: n }); S.push({ t: 'user', ph: 'fin', sp: n, limit: 60, auto: false, tag: '마지막으로 하고 싶은 말', prompt: SCRIPTS.lastq, replay: ['sc-lastq', 'j1', SCRIPTS.lastq] }); }
+      else say(n, `la-${k}-${vo(n)}`, CLOSING[k][vo(n)], { ph: 'fin', sp: n });
     });
   } else {
+    // 다른 번호 문제: 가상 지원자는 1분 요약이 자기 목소리로 만들어진 문항에, 나는 무작위로 뽑은 다른 번호에 답한다.
+    const target = n => seatWithVoice(pos, me, +Object.keys(CYC3).find(x => CYC3[x] === vo(n)));
+    const others = [1, 2, 3, 4, 5].filter(t => t !== me);
+    const later = others.filter(t => { const a = others.find(n => target(n) === t); return a && a < me; });
+    const mine = pick(later.length ? later : others);
     say('j1', 'sc-fC', SCRIPTS.fC, { ph: 'fin', turn: true, sp: 'j1' });
     order.forEach(n => {
-      const m = OTHER_NO[n];
-      say('j1', `sc-cc-${n}`, SCRIPTS[`cc-${n}`], { ph: 'fin', sp: n, qno: m, turn: true });
-      if (n === 2) { say('j1', q(m).id + '-q', q(m).q, { ph: 'fin', sp: 2, qno: m }); S.push({ t: 'user', ph: 'fin', sp: 2, qno: m, limit: 60, auto: false, tag: `${m}번 문제`, prompt: q(m).q, replay: [q(m).id + '-q', 'j1', q(m).q] }); }
+      const m = n === me ? mine : target(n);
+      say('j1', `sc-cc-${n}-${m}`, SCRIPTS[`cc-${n}-${m}`], { ph: 'fin', sp: n, qno: m, turn: true });
+      if (n === me) { say('j1', q(m).id + '-q', q(m).q, { ph: 'fin', sp: n, qno: m }); S.push({ t: 'user', ph: 'fin', sp: n, qno: m, limit: 60, auto: false, tag: `${m}번 문제`, prompt: q(m).q, replay: [q(m).id + '-q', 'j1', q(m).q] }); }
       else say(n, q(m).id + '-s', q(m).s, { ph: 'fin', sp: n, qno: m });
     });
   }
@@ -177,7 +192,7 @@ function Person({ x, y, p, speaking }) {
   );
 }
 
-function Room({ active, mySeat, onSeat, busy }) {
+function Room({ active, mySeat, pos, onSeat, busy }) {
   const judges = [['j1', 330, '위원 1', '진행'], ['j2', 500, '위원 2', '꼬리질문'], ['j3', 670, '위원 3', '인성질문']];
   const seats = [1, 2, 3, 4, 5].map((n, i) => [n, 140 + i * 180]);
   const hit = (key, x, y, w, h, label) => (
@@ -208,7 +223,7 @@ function Room({ active, mySeat, onSeat, busy }) {
         <g key={n}>
           {n === mySeat && <rect x={x - 72} y={356} width={144} height={222} rx={16} className="cr-mine" />}
           {active === n && <rect x={x - 72} y={356} width={144} height={222} rx={16} className="cr-glow" />}
-          <Person x={x} y={410} p={PEOPLE[n]} speaking={active === n} />
+          <Person x={x} y={410} p={n === mySeat ? PEOPLE[2] : PEOPLE[voiceOf(pos, n)]} speaking={active === n} />
           <text x={x} y={530} className="cr-name">지원자 {n}</text>
           <text x={x} y={552} className={'cr-role' + (n === mySeat ? ' me' : '')}>{n === mySeat ? '내 자리' : '답변 듣기'}</text>
           {hit(n, x - 72, 356, 144, 222, n === mySeat ? '내 자리, 배정 문제로 2분 답변 연습' : `지원자 ${n} 1차 모범답변 듣기`)}
@@ -221,7 +236,6 @@ function Room({ active, mySeat, onSeat, busy }) {
 // ── 화면 ───────────────────────────────────────────────────
 export default function CnuRoom({ onBack }) {
   const [store, setStore] = useState(loadStore);
-  const [theme, setTheme] = useState(() => read(THEME, '1'));
   const [speed, setSpeedS] = useState(() => read(SPEED, 1));
   const speedRef = useRef(speed); speedRef.current = speed;
   const audio = useAudio(speedRef), timer = useTimer();
@@ -232,11 +246,10 @@ export default function CnuRoom({ onBack }) {
   const [drawn, setDrawn] = useState(null);
   const capRef = useRef(null), preRef = useRef(null);
 
-  const setIdx = store.cur, assign = store.assign[setIdx];
+  const setIdx = store.cur, A = store.assign[setIdx], assign = A.pos, me = A.me;
   const qAt = p => BY_ID[assign[p - 1]];
   const round = store.opened.indexOf(setIdx) + 1;
   const save = n => { setStore(n); write(STORE, n); };
-  useEffect(() => { write(THEME, theme); }, [theme]);
   const setSpeed = v => { setSpeedS(v); write(SPEED, v); audio.rate(v); };
   useEffect(() => { const t = setTimeout(() => setNotice(''), 4200); return () => clearTimeout(t); }, [notice]);
 
@@ -256,6 +269,8 @@ export default function CnuRoom({ onBack }) {
     if (st.t === 'say') audio.play(st.key, () => { if (sess.current.token === token && !sess.current.paused) exec(pos + 1); });
     else if (st.t === 'user') {
       audio.stop();
+      // 2차 직전: 내가 요약하고 반박할 1차 답변을 무작위로 정한다(내 1차 문항과 다른 번호).
+      if (st.draw && !s.drawn) { const t = pick([1, 2, 3, 4, 5].filter(n => n !== s.me)); s.drawn = t; setDrawn(t); }
       if (st.auto) timer.start(st.limit, () => finish(token));
     } else if (st.t === 'end') {
       audio.stop();
@@ -274,8 +289,13 @@ export default function CnuRoom({ onBack }) {
     const s = sess.current; s.token++; s.mode = m; s.steps = []; s.pos = 0; s.paused = false; s.drawn = null;
     audio.stop(); timer.stop(); setPaused(false); setDrawn(null); setView({ mode: m, pos: 0 });
   };
-  const run = (m, steps) => { stopAll(m); const s = sess.current; s.mode = m; s.steps = steps; exec(0); };
-  const startFull = () => run('full', buildSteps(setIdx, assign));
+  const run = (m, steps, seat = me) => { stopAll(m); const s = sess.current; s.mode = m; s.steps = steps; s.me = seat; exec(0); };
+  // 면접을 시작할 때마다 내 자리 번호와 문항 배정을 새로 뽑는다.
+  const startFull = () => {
+    const a = makeAssign(SETS[setIdx]);
+    save({ ...store, assign: { ...store.assign, [setIdx]: a } });
+    run('full', buildSteps(setIdx, a), a.me);
+  };
   const pause = () => { const s = sess.current; if (s.mode === 'wait' || s.paused) return; s.paused = true; setPaused(true); audio.pause(); timer.pause(); };
   const resume = () => {
     const s = sess.current; if (!s.paused) return; s.paused = false; setPaused(false);
@@ -287,14 +307,13 @@ export default function CnuRoom({ onBack }) {
   const onSeat = k => {
     if (mode === 'full') { setNotice('전체면접 중에는 좌석 연습을 할 수 없어요. ‘대기실로 돌아가기’ 후 이용하세요.'); return; }
     if (k === 'j1') return run('solo', [{ t: 'say', who: 'j1', key: 'sc-intro', text: SCRIPTS.intro, ph: 'solo', sp: 'j1', turn: true }, { t: 'end', ph: 'solo' }]);
-    if (k === 'j2') { const q2 = qAt(2); return run('solo', [{ t: 'say', who: 'j2', key: q2.id + '-f', text: q2.f, ph: 'solo', sp: 'j2', qno: 2, turn: true, tag: '꼬리질문' }, { t: 'user', ph: 'solo', sp: 2, qno: 2, limit: 60, auto: true, prompt: q2.f, tag: '꼬리질문' }, { t: 'end', ph: 'solo' }]); }
-    if (k === 'j3') { const i = Math.floor(Math.random() * PRACTICE.length); return run('solo', [{ t: 'say', who: 'j3', key: `pp-${i}`, text: PRACTICE[i], ph: 'solo', sp: 'j3', turn: true, tag: '인성질문' }, { t: 'user', ph: 'solo', sp: 2, limit: 60, auto: true, prompt: PRACTICE[i], tag: '인성질문' }, { t: 'end', ph: 'solo' }]); }
-    if (k === 2) { const q2 = qAt(2); return run('solo', [{ t: 'say', who: 'j1', key: q2.id + '-q', text: q2.q, ph: 'solo', sp: 'j1', qno: 2, turn: true }, { t: 'user', ph: 'solo', sp: 2, qno: 2, limit: 120, auto: true }, { t: 'end', ph: 'solo' }]); }
+    if (k === 'j2') { const qm = qAt(me); return run('solo', [{ t: 'say', who: 'j2', key: qm.id + '-f', text: qm.f, ph: 'solo', sp: 'j2', qno: me, turn: true, tag: '꼬리질문' }, { t: 'user', ph: 'solo', sp: me, qno: me, limit: 60, auto: true, prompt: qm.f, tag: '꼬리질문' }, { t: 'end', ph: 'solo' }]); }
+    if (k === 'j3') { const i = Math.floor(Math.random() * PRACTICE.length); return run('solo', [{ t: 'say', who: 'j3', key: `pp-${i}`, text: PRACTICE[i], ph: 'solo', sp: 'j3', turn: true, tag: '인성질문' }, { t: 'user', ph: 'solo', sp: me, limit: 60, auto: true, prompt: PRACTICE[i], tag: '인성질문' }, { t: 'end', ph: 'solo' }]); }
+    if (k === me) { const qm = qAt(me); return run('solo', [{ t: 'say', who: 'j1', key: qm.id + '-q', text: qm.q, ph: 'solo', sp: 'j1', qno: me, turn: true }, { t: 'user', ph: 'solo', sp: me, qno: me, limit: 120, auto: true }, { t: 'end', ph: 'solo' }]); }
     const q = qAt(k);
     run('solo', [{ t: 'say', who: k, key: q.id + '-m1', text: q.m1, ph: 'solo', sp: k, qno: k, turn: true, tag: '1차 모범답변' }, { t: 'end', ph: 'solo' }]);
   };
 
-  const drawTarget = () => { const s = sess.current; if (s.drawn) return; const t = pick([1, 3, 4, 5]); s.drawn = t; setDrawn(t); };
   const replay = (key) => audio.play(key, () => {});
 
   const newRound = () => {
@@ -321,23 +340,23 @@ export default function CnuRoom({ onBack }) {
   if (mode !== 'wait' && step) {
     if (step.t === 'end') { headline = mode === 'full' ? '면접이 끝났습니다' : '개별 연습이 끝났습니다'; sub = mode === 'full' ? '대기실로 돌아가 다시 연습하거나 새 회차를 열 수 있어요.' : '다른 좌석을 눌러 계속 연습할 수 있어요.'; }
     else if (isUser) {
-      headline = timer.on ? '지금 답변하세요' : step.draw && !drawn ? '반박할 답변을 뽑으세요' : `${step.limit === 60 ? '1분' : '2분'} 답변을 준비하세요`;
-      if (step.ph === 'r1') sub = `${step.qno}번 문제 · 2분 동안 소리 내어 답변하세요.`;
-      else if (step.draw) sub = drawn ? `${drawn}번 문제 · 지원자 ${drawn}의 1차 의견에 응답 — 먼저 상대 의견을 공정하게 요약하고, 이어서 추가·보완·반대 중 필요한 방식으로 본인의 견해를 제시하세요.` : '지원자 1·3·4·5 중 한 명의 1차 답변이 무작위로 배정됩니다.';
+      headline = timer.on ? '지금 답변하세요' : step.draw ? `지원자 ${drawn}의 1차 답변에 응답하세요` : `${step.limit === 60 ? '1분' : '2분'} 답변을 준비하세요`;
+      if (step.ph === 'r1') sub = `내 자리는 지원자 ${me} · ${step.qno}번 문제 · 2분 동안 소리 내어 답변하세요.`;
+      else if (step.draw) sub = `${drawn}번 문제 · 지원자 ${drawn}의 1차 의견에 응답 (무작위 배정) — 먼저 상대 의견을 공정하게 요약하고, 이어서 추가·보완·반대 중 필요한 방식으로 본인의 견해를 제시하세요.`;
       else if (step.tag) sub = `${step.tag} · 1분 동안 답변하세요.`;
       else if (step.ph === 'solo') sub = `${step.qno}번 문제 · 배정 문제로 2분 답변을 연습합니다.`;
       else sub = step.qno ? `${step.qno}번 문제 · 1분 동안 답변하세요.` : '1분 동안 답변하세요.';
     } else {
-      headline = `${whoName(step.who)} ${step.who === 'j1' || step.who === 'j2' || step.who === 'j3' ? '발언 중' : '답변 중'}`;
+      headline = `${whoName(step.who, me)} ${step.who === 'j1' || step.who === 'j2' || step.who === 'j3' ? '발언 중' : '답변 중'}`;
       if (target) sub = `${target}번 문제 · 지원자 ${target}의 1차 의견에 응답`;
       else if (step.qno && typeof step.who === 'number') sub = `${step.qno}번 문제${step.tag ? ' · ' + step.tag : ''}`;
-      else if (step.qno && step.sp === 2) sub = `지원자 2 · ${step.qno}번 문제`;
+      else if (step.qno && step.sp === me) sub = `지원자 ${me}(나) · ${step.qno}번 문제`;
       else if (typeof step.sp === 'number' && step.who === 'j1') sub = `다음 차례 · 지원자 ${step.sp}${step.qno ? ` · ${step.qno}번 문제` : ''}`;
       else sub = step.tag || PHASE[step.ph] || '';
     }
   }
   const caption = mode !== 'wait' && step ? (step.t === 'say' ? step.text : isUser ? (step.prompt || (step.qno && step.ph !== 'r2' ? qAt(step.qno).q : step.draw && drawn ? qAt(drawn).m1 : '')) : '') : '';
-  const capLabel = step && step.t === 'say' ? `${whoName(step.who)} · 자막` : isUser && step.draw && drawn ? `지원자 ${drawn}의 1차 답변 · 자막` : isUser ? '질문' : '답변 자막';
+  const capLabel = step && step.t === 'say' ? `${whoName(step.who, me)} · 자막` : isUser && step.draw && drawn ? `지원자 ${drawn}의 1차 답변 · 자막` : isUser ? '질문' : '답변 자막';
   const clock = isUser ? (timer.on ? timer.left : step.limit) : step && step.t === 'say' ? audio.left : 120;
   const limit = isUser ? step.limit : step && step.t === 'say' ? (AUDIO[step.key]?.d || 0) / speed : 120;
   const frac = limit ? Math.max(0, Math.min(1, clock / limit)) : 1;
@@ -345,16 +364,15 @@ export default function CnuRoom({ onBack }) {
 
   useEffect(() => { const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = o; }; }, []);
   return createPortal(
-    <div className="cr" data-theme={theme}>
+    <div className="cr">
       <header className="cr-top">
         <div className="cr-title">
           <button className="cr-back" onClick={() => { stopAll(); onBack(); }} aria-label="학교 목록으로">←<em> 학교 목록</em></button>
           <span className="cr-kicker">GROUP INTERVIEW · 충남대학교 법학전문대학원</span>
           <h1>충남대 로스쿨 <span>면접 </span>시뮬레이션</h1>
-          <p>다섯 명이 차례로 지정된 문제에 답합니다. <b>지원자 2는 내 자리입니다.</b></p>
+          <p>다섯 명이 차례로 지정된 문제에 답합니다. <b>면접을 시작하면 내 자리 번호와 문제가 무작위로 정해집니다.</b></p>
         </div>
         <div className="cr-topbtns">
-          <Themes theme={theme} setTheme={setTheme} className="cr-themes top" />
           <button className="cr-btn ghost" onClick={() => setHist(true)}>이전<span className="cr-wide"> 회차</span></button>
           <button className="cr-btn ghost" onClick={newRound}>↻ 새 회차</button>
         </div>
@@ -363,7 +381,7 @@ export default function CnuRoom({ onBack }) {
       <main className="cr-main">
         <section className="cr-room">
           <div className="cr-room-head"><span><i className="cr-dot" />면접실 01</span><span>ROUND {String(round).padStart(2, '0')}</span></div>
-          <div className="cr-room-body"><Room active={active} mySeat={2} onSeat={onSeat} busy={mode === 'full'} /></div>
+          <div className="cr-room-body"><Room active={active} mySeat={me} pos={assign} onSeat={onSeat} busy={mode === 'full'} /></div>
           <div className="cr-room-foot">{mode === 'full' ? '면접이 진행 중입니다. 일시정지와 다음 차례는 오른쪽 진행 영역에서 할 수 있어요.' : '다른 지원자를 누르면 1차 모범답변을, 위원을 누르면 안내·꼬리질문·인성질문을 바로 연습할 수 있습니다.'}</div>
         </section>
 
@@ -378,7 +396,6 @@ export default function CnuRoom({ onBack }) {
           <h2 className={isUser && timer.on ? 'now' : ''}>{paused ? '일시정지됨' : headline}</h2>
           <p className="cr-sub">{sub}</p>
 
-          {isUser && step.draw && !drawn && <button className="cr-btn primary" onClick={drawTarget}>반박할 답변 뽑기</button>}
           {isUser && !timer.on && !step.auto && (!step.draw || drawn) && (
             <div className="cr-row">
               <button className="cr-btn primary" onClick={startUser} disabled={paused}>{step.limit === 60 ? '1분' : '2분'} 답변 시작</button>
@@ -417,7 +434,6 @@ export default function CnuRoom({ onBack }) {
             </select>
             <small>마지막 1분 · {ftype}</small>
           </label>
-          <Themes theme={theme} setTheme={setTheme} className="cr-themes bottom" />
           {notice && <div className="cr-notice">{notice}</div>}
         </section>
       </main>
@@ -427,11 +443,11 @@ export default function CnuRoom({ onBack }) {
         <div className="cr-steps">
           <div><b>01</b><div><strong>대기실 준비</strong><span>찬반형·견해 제시형·해결방안 제시형 문제를 함께 준비합니다.</span></div></div>
           <div><b>02</b><div><strong>1차 발언 · 2분</strong><span>지정된 문제에 답합니다.</span></div></div>
-          <div><b>03</b><div><strong>2차 발언 · 2분</strong><span>다른 지원자의 1차 답변을 뽑아 응답하고, 마지막 1분 질문에 답합니다.</span></div></div>
+          <div><b>03</b><div><strong>2차 발언 · 2분</strong><span>무작위로 배정된 다른 지원자의 1차 답변을 요약하고 반박한 뒤, 마지막 1분 질문에 답합니다.</span></div></div>
         </div>
       </footer>
 
-      {sheet && <Sheet title={`ROUND ${String(round).padStart(2, '0')} 문제지`} assign={assign} onClose={() => setSheet(false)} />}
+      {sheet && <Sheet title={`ROUND ${String(round).padStart(2, '0')} 문제지`} assign={assign} me={me} onClose={() => setSheet(false)} />}
       {hist && (
         <div className="cr-modal" onClick={e => e.target === e.currentTarget && setHist(false)}>
           <div className="cr-modal-in">
@@ -446,15 +462,7 @@ export default function CnuRoom({ onBack }) {
   );
 }
 
-function Themes({ theme, setTheme, className }) {
-  return (
-    <div className={className} role="group" aria-label="색감 선택">
-      {['1', '2', '3'].map(t => <button key={t} className={theme === t ? 'on' : ''} onClick={() => setTheme(t)} aria-label={`색감 ${t}안`}><i data-t={t} />{t}안</button>)}
-    </div>
-  );
-}
-
-function Sheet({ title, assign, onClose }) {
+function Sheet({ title, assign, me, onClose }) {
   return (
     <div className="cr-modal" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="cr-modal-in wide">
@@ -466,7 +474,7 @@ function Sheet({ title, assign, onClose }) {
               <li key={id}>
                 <div className="cr-sheet-no">{i + 1}</div>
                 <div>
-                  <div className="cr-sheet-meta">{`지원자 ${i + 1}${i === 1 ? ' · 내 문제' : ''}`} · {TYPE_LABEL[q.type]} · {q.field}{q.gichul ? ' · 기출' : ''}</div>
+                  <div className="cr-sheet-meta">{`지원자 ${i + 1}${i + 1 === me ? ' · 내 문제' : ''}`} · {TYPE_LABEL[q.type]} · {q.field}{q.gichul ? ' · 기출' : ''}</div>
                   <p>{q.q}</p>
                 </div>
               </li>
@@ -492,7 +500,7 @@ function HistList({ store, cur, onOpen }) {
           </li>
         ))}
       </ul>
-      {peek != null && <Sheet title={`ROUND ${String(store.opened.indexOf(peek) + 1).padStart(2, '0')} 문제지`} assign={store.assign[peek]} onClose={() => setPeek(null)} />}
+      {peek != null && <Sheet title={`ROUND ${String(store.opened.indexOf(peek) + 1).padStart(2, '0')} 문제지`} assign={store.assign[peek].pos} me={store.assign[peek].me} onClose={() => setPeek(null)} />}
     </>
   );
 }

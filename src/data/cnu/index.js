@@ -4,4 +4,4 @@ import ROUNDS from './rounds.js';
 const files = import.meta.glob('./r[0-9]*.js', { eager: true });
 const BY = Object.fromEntries(Object.values(files).flatMap(f => f.default).map(q => [q.id, q]));
 export const SETS = ROUNDS.map(ids => ids.map(id => BY[id]));
-export { SEAT_VOICE, CYC2, CYC3, OTHER_NO, SCRIPTS, FINAL_TYPES, PERSONAL, CLOSING, PRACTICE, clips } from './meta.js';
+export { SEAT_VOICE, CYC2, CYC3, SCRIPTS, FINAL_TYPES, PERSONAL, CLOSING, PRACTICE, clips } from './meta.js';
