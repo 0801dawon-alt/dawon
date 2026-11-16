@@ -12,6 +12,8 @@ import { DetailPanel, EntryForm } from './components/Detail.jsx';
 import { useSwipeBack } from './lib/swipeBack.js';
 import Questions from './components/Questions.jsx';
 import Passage from './components/Passage.jsx';
+import { SchoolList } from './components/Schools.jsx';
+import CnuRoom from './components/CnuRoom.jsx';
 import Timer, { MiniTimer } from './components/Timer.jsx';
 import { MyPage, Record } from './components/Record.jsx';
 import Settings from './components/Settings.jsx';
@@ -120,8 +122,9 @@ export default function App() {
   // Pages: home, library, or a mock-interview tab; kept in the address as #/library, #/mock/practice …
   const MOCK = ['questions', 'passage', 'practice', 'records'];
   const readRoute = () => {
-    const m = location.hash.match(/^#\/(library|mock)(?:\/(\w+))?/);
+    const m = location.hash.match(/^#\/(library|mock|schools)(?:\/(\w+))?/);
     if (!m) return { section: 'home', tab: 'questions' };
+    if (m[1] === 'schools') return { section: 'schools', tab: m[2] === 'cnu' ? 'cnu' : 'list' };
     return { section: m[1], tab: MOCK.includes(m[2]) ? m[2] : 'questions' };
   };
   const [route, setRoute] = useState(readRoute);
@@ -146,8 +149,8 @@ export default function App() {
     return () => { window.removeEventListener('popstate', pop); window.removeEventListener('hashchange', on); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const nav = (section, tab) => {
-    const next = { section, tab: tab || (section === 'mock' ? route.tab : route.tab) };
-    const hash = section === 'home' ? '#/' : section === 'library' ? '#/library' : '#/mock/' + next.tab;
+    const next = { section, tab: section === 'schools' ? (tab || 'list') : tab || (route.section === 'mock' ? route.tab : 'questions') };
+    const hash = section === 'home' ? '#/' : section === 'library' ? '#/library' : section === 'schools' ? (next.tab === 'list' ? '#/schools' : '#/schools/' + next.tab) : '#/mock/' + next.tab;
     if (layers.current.length) { layers.current.forEach(n => raw[n](n === 'settings' ? false : null)); layers.current = []; }
     const push = () => { if (location.hash !== hash) { history.pushState(null, '', location.pathname + location.search + hash); depth.current += 1; } };
     if (skipPops.current > 0) afterPop.current.push(push); else push();
@@ -516,6 +519,10 @@ export default function App() {
         page={page} setPage={p => { setPageState(p); scrollToEl(refs.lib.current); }}
         onOpen={openTopic} viewed={viewed} onNew={() => setForm(EMPTY_FORM)}
       />
+      </div>
+      <div hidden={!show('schools')}>
+        {route.section === 'schools' && route.tab === 'list' && <SchoolList onPick={id => nav('schools', id)} />}
+        {route.section === 'schools' && route.tab === 'cnu' && <CnuRoom onBack={() => nav('schools')} />}
       </div>
       <div hidden={!show('mock')} className="mock-stack">
       <div {...panel('questions')}>
