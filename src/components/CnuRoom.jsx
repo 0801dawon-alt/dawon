@@ -5,7 +5,7 @@ import AUDIO from '../data/cnu/audio.json';
 import './cnu-room.css';
 
 const BASE = (import.meta.env.BASE_URL || './') + 'cnu-audio/';
-const STORE = 'tl-cnu-room-v1', THEME = 'tl-cnu-theme', SPEED = 'tl-cnu-speed';
+const STORE = 'tl-cnu-room-v2', THEME = 'tl-cnu-theme', SPEED = 'tl-cnu-speed';
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage off */ } };
 const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
@@ -17,21 +17,21 @@ const PHASE = { wait: '면접 대기실', r1: '1차 발언', r2: '2차 발언', 
 const WHO = { j1: '면접위원 1', j2: '면접위원 2', j3: '면접위원 3' };
 const whoName = w => WHO[w] || `지원자 ${w}`;
 
-// 문항 배정: 가상 지원자 좌석(1·3·4·5)에는 그 좌석 목소리로 만든 답변이 있는 문항을, 나머지 둘은 2번과 6번에.
+// 문항 배정: 가상 지원자 좌석(1·3·4·5)에는 그 좌석 목소리로 만든 답변이 있는 문항을, 남은 하나는 내 자리(2번)에.
 function makeAssign(set) {
-  const pos = Array(6).fill(null), left = [...set];
+  const pos = Array(5).fill(null), left = [...set];
   shuffle([1, 3, 4, 5]).forEach(p => {
     const c = left.filter(q => q.v === p);
     const q = c.length ? pick(c) : pick(left);
     pos[p - 1] = q.id; left.splice(left.indexOf(q), 1);
   });
-  const rest = shuffle(left); pos[1] = rest[0].id; pos[5] = rest[1].id;
+  pos[1] = left[0].id;
   return pos;
 }
 
 function loadStore() {
   const s = read(STORE, null);
-  if (s && Array.isArray(s.opened) && s.opened.every(i => SETS[i]) && s.cur != null && s.assign && s.assign[s.cur]) return s;
+  if (s && Array.isArray(s.opened) && s.opened.every(i => SETS[i]) && s.cur != null && s.assign && s.assign[s.cur] && s.assign[s.cur].length === 5) return s;
   const i = Math.floor(Math.random() * SETS.length);
   const n = { opened: [i], cur: i, assign: { [i]: makeAssign(SETS[i]) }, done: [] };
   write(STORE, n); return n;
@@ -423,7 +423,7 @@ export default function CnuRoom({ onBack }) {
       </main>
 
       <footer className="cr-foot">
-        <button className="cr-sheetbar" onClick={() => setSheet(true)}><b>▸ 면접 문제 보기</b><span>이번 회차 · 6문제 · 1~5번은 지원자 1~5에게 지정</span></button>
+        <button className="cr-sheetbar" onClick={() => setSheet(true)}><b>▸ 면접 문제 보기</b><span>이번 회차 · 5문제 · 1~5번은 지원자 1~5에게 지정</span></button>
         <div className="cr-steps">
           <div><b>01</b><div><strong>대기실 준비</strong><span>찬반형·견해 제시형·해결방안 제시형 문제를 함께 준비합니다.</span></div></div>
           <div><b>02</b><div><strong>1차 발언 · 2분</strong><span>지정된 문제에 답합니다.</span></div></div>
@@ -466,7 +466,7 @@ function Sheet({ title, assign, onClose }) {
               <li key={id}>
                 <div className="cr-sheet-no">{i + 1}</div>
                 <div>
-                  <div className="cr-sheet-meta">{i < 5 ? `지원자 ${i + 1}${i === 1 ? ' · 내 문제' : ''}` : '추가 문항'} · {TYPE_LABEL[q.type]} · {q.field}{q.gichul ? ' · 기출' : ''}</div>
+                  <div className="cr-sheet-meta">{`지원자 ${i + 1}${i === 1 ? ' · 내 문제' : ''}`} · {TYPE_LABEL[q.type]} · {q.field}{q.gichul ? ' · 기출' : ''}</div>
                   <p>{q.q}</p>
                 </div>
               </li>
