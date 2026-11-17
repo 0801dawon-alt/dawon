@@ -14,6 +14,8 @@ import Questions from './components/Questions.jsx';
 import Passage from './components/Passage.jsx';
 import { SchoolList } from './components/Schools.jsx';
 import CnuRoom from './components/CnuRoom.jsx';
+import IndivRoom from './components/IndivRoom.jsx';
+import { FORMATS } from './data/schools/formats.js';
 import Timer, { MiniTimer } from './components/Timer.jsx';
 import { MyPage, Record } from './components/Record.jsx';
 import Settings from './components/Settings.jsx';
@@ -124,7 +126,7 @@ export default function App() {
   const readRoute = () => {
     const m = location.hash.match(/^#\/(library|mock|schools)(?:\/(\w+))?/);
     if (!m) return { section: 'home', tab: 'questions' };
-    if (m[1] === 'schools') return { section: 'schools', tab: m[2] === 'cnu' ? 'cnu' : 'list' };
+    if (m[1] === 'schools') return { section: 'schools', tab: m[2] === 'cnu' || FORMATS[m[2]] ? m[2] : 'list' };
     return { section: m[1], tab: MOCK.includes(m[2]) ? m[2] : 'questions' };
   };
   const [route, setRoute] = useState(readRoute);
@@ -523,6 +525,7 @@ export default function App() {
       <div hidden={!show('schools')}>
         {route.section === 'schools' && route.tab === 'list' && <SchoolList onPick={id => nav('schools', id)} />}
         {route.section === 'schools' && route.tab === 'cnu' && <CnuRoom onBack={() => nav('schools')} />}
+        {route.section === 'schools' && FORMATS[route.tab] && <IndivRoom key={route.tab} school={route.tab} onBack={() => nav('schools')} />}
       </div>
       <div hidden={!show('mock')} className="mock-stack">
       <div {...panel('questions')}>
