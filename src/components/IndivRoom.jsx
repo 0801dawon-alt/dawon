@@ -21,6 +21,11 @@ const GENERIC_FU = [
   '제시한 해결책이 실제로 시행될 때 생길 수 있는 부작용은 무엇입니까?',
   '두 가치가 충돌할 때 지원자는 어떤 기준으로 우선순위를 정했습니까?',
   '방금 답변에서 제시문의 어느 부분을 근거로 삼았는지 짚어 주시겠습니까?',
+  '지원자의 주장이 틀렸다고 판명될 수 있는 상황이 있다면 어떤 경우입니까?',
+  '그 주장을 실제 정책으로 옮긴다면 가장 먼저 무엇을 바꾸겠습니까?',
+  '방금 든 예시와 반대되는 사례가 있다면 지원자의 결론은 달라집니까?',
+  '지원자의 입장으로 가장 손해를 보는 사람은 누구이고, 그 손해는 정당화됩니까?',
+  '같은 질문을 10년 뒤에 받는다면 답이 달라질 수 있다고 봅니까?',
 ];
 
 // ── 면접위원 음성: 브라우저 음성 합성. 한국어 음성이 없으면 자막만 보여 준다. ──
@@ -132,9 +137,10 @@ function useCountdown() {
   return { left, start, stop };
 }
 
-// ── 면접실 그림: 면접위원 3명과 지원자 1명. ──
+// ── 면접실 그림: 면접위원(2~3명)과 지원자 1명. ──
 function Room({ active, roles, onJudge, me }) {
-  const xs = [330, 500, 670];
+  const xs = roles.length === 2 ? [400, 600] : [330, 500, 670];
+  const JUDGE = ['j1', 'j2', 'j3'].slice(0, roles.length);
   return (
     <svg className="cr-svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
       <g className="cr-band"><line x1="380" y1="34" x2="440" y2="34" /><text x="500" y="39">면접위원석</text><line x1="560" y1="34" x2="620" y2="34" /></g>
@@ -175,7 +181,7 @@ function Passage({ set, show }) {
   return (
     <div className="ir-doc">
       <h3>{set.title}</h3>
-      {set.ps.map(p => (
+      {(set.ps || []).map(p => (
         <div key={p.label} className="ir-ps"><b>{p.label.length > 2 ? p.label : `(${p.label})`}</b>{p.source && <small>{p.source}</small>}<p>{p.text}</p></div>
       ))}
       <ol className="ir-qs">{set.qs.map((q, i) => show.includes(i) && <li key={i} value={i + 1}>{q}</li>)}</ol>
@@ -187,14 +193,15 @@ const followupPrompt = (set, q, answer, prev, kind) => `너는 로스쿨 개별 
 ${kind === 'probe' ? '제시문을 제대로 읽었는지 확인하거나, 지원자가 놓친 제시문의 내용을 짚어 묻는 질문 1개를 던져라.' : kind === 'counter' ? '지원자 답변과 반대되는 입장의 가장 강한 논거를 들어 재반박을 요구하는 질문 1개를 던져라.' : '지원자의 답변을 듣고 꼬리질문 1개를 던져라. 답변의 전제나 기준을 흔들거나, 약한 근거를 파고들거나, 제시한 대안의 부작용과 실현 가능성을 따지는 것 가운데 가장 효과적인 것을 고른다.'}
 답변에 실제로 나온 표현을 짚어서 구체적으로 묻고, 2문장을 넘기지 않는다. '~입니까?'로 끝낸다. 이전 질문과 겹치지 않게 한다. 질문 문장만 출력.
 [제시문 제목] ${set.title}
-[제시문] ${set.ps.map(p => `(${p.label}) ${p.text}`).join('\n').slice(0, 3500)}
+${set.ps.length ? '[제시문] ' + set.ps.map(p => `(${p.label}) ${p.text}`).join('\n').slice(0, 3500) : ''}
 [문제] ${q}
 [지원자 답변] ${(answer || '(답변 없음)').slice(0, 2500)}
 ${prev.length ? '[이미 한 질문] ' + prev.join(' / ') : ''}`;
 
 export default function IndivRoom({ school, onBack }) {
   const cfg = FORMATS[school];
-  const stage = cfg.stages[0];
+  const stage = cfg.stages[0] || null;
+  const LASTJ = JUDGE[cfg.judges.length - 1];
   const voice = useVoice();
   const mic = useListen();
   const prepClock = useCountdown();
@@ -217,6 +224,16 @@ export default function IndivRoom({ school, onBack }) {
   const drawSet = async () => {
     const b = await loadBank();
     const seen = read(seenKey, []);
+    // 제시문 없이 면접실에서 질문을 받는 학교: 모범답안이 있는 단독 질문 두 개(서로 다른 주제).
+    if (cfg.source === 'q') {
+      const pool = b.qs.filter(x => x.m && x.q && x.q.length <= 220);
+      const fresh = pool.filter(x => !seen.includes(x.q));
+      const a = pick(fresh.length ? fresh : pool);
+      const rest = (fresh.length > 1 ? fresh : pool).filter(x => x !== a && x.t !== a.t);
+      const c = pick(rest);
+      write(seenKey, [...seen, a.q, c.q].slice(-800));
+      return { id: 'q-' + Date.now(), title: '면접 질문', lt: '질문형', ps: [], qs: [a.q, c.q], ms: [a.m, c.m], fu: [], qi: 0 };
+    }
     const pool = b.ps.filter(p => (p.qs || []).length >= (cfg.main === 'next' ? 3 : 1) && (p.ps || []).length);
     const fresh = pool.filter(p => !seen.includes(p.id));
     const p = pick(fresh.length ? fresh : pool);
@@ -261,7 +278,9 @@ export default function IndivRoom({ school, onBack }) {
     setMode('oral'); setLog([]); setTimeUp(false);
     Object.assign(s.current, { main: mainIdx, mi: 0, fuUsed: [], pqUsed: [], asked: [], count: 0, timeUp: false });
     oralClock.start(cfg.oral, () => { s.current.timeUp = true; setTimeUp(true); });
-    const intro = cfg.main === 'next'
+    const intro = cfg.source === 'q'
+      ? '자리에 앉으세요. 지금부터 면접을 시작하겠습니다. 질문을 드리면 잠시 생각한 뒤 답변해 주세요.'
+      : cfg.main === 'next'
       ? '자리에 앉으세요. 지금부터 구술면접을 시작하겠습니다. 서면으로 답한 문제와 같은 제시문에 딸린 다른 문제를 드리겠습니다. 잠시 생각한 뒤 답변해 주세요.'
       : cfg.main === 'all'
         ? '자리에 앉으세요. 지금부터 구술면접을 시작하겠습니다. 작성한 서면 답안을 바탕으로 질문하겠습니다. 답안을 보면서 답해도 됩니다.'
@@ -281,7 +300,7 @@ export default function IndivRoom({ school, onBack }) {
 
   const fallbackFu = () => {
     const st = s.current;
-    const list = [...(set.fu || []), ...GENERIC_FU].filter(x => !st.fuUsed.includes(x) && !st.asked.includes(x));
+    const list = [...(set.fu || []), ...GENERIC_FU.filter(x => set.ps.length || !x.includes('제시문'))].filter(x => !st.fuUsed.includes(x) && !st.asked.includes(x));
     const q = list[0] || pick(GENERIC_FU);
     st.fuUsed.push(q);
     return q;
@@ -306,7 +325,7 @@ export default function IndivRoom({ school, onBack }) {
   const afterMains = () => {
     const st = s.current;
     if (cfg.personal && st.pqUsed.length < 2) return say('j3', personalQ(), 'pq');
-    return follow(st.count % 2 ? 'j3' : 'j2');
+    return follow(st.count % 2 ? LASTJ : 'j2');
   };
 
   // 위원 who가 지원자의 마지막 답변을 듣고 질문한다.
@@ -360,9 +379,9 @@ export default function IndivRoom({ school, onBack }) {
   // ── 화면 ──
   const active = phase === 'speaking' || phase === 'thinking' ? turn && turn.who : phase === 'answer' ? 'me' : null;
   const whoLabel = w => w === 'me' ? '지원자(나)' : `위원 ${JUDGE.indexOf(w) + 1} · ${cfg.judges[JUDGE.indexOf(w)][0]}`;
-  const PH = [['wait', '대기실'], ['prep', stage.label], ['oral', '구술면접'], ['end', '면접 종료']];
+  const PH = [['wait', '대기실'], ...(stage ? [['prep', stage.label]] : []), ['oral', '구술면접'], ['end', '면접 종료']];
   let headline = '대기실', sub = cfg.summary;
-  if (mode === 'wait') { headline = '면접을 시작하세요'; sub = `${stage.label} ${mmss(stage.sec).replace(/^0/, '')} → 구술면접 ${Math.round(cfg.oral / 60)}분. ${stage.how}`; }
+  if (mode === 'wait') { headline = '면접을 시작하세요'; sub = stage ? `${stage.label} ${mmss(stage.sec).replace(/^0/, '')} → 구술면접 ${Math.round(cfg.oral / 60)}분. ${stage.how}` : `구술면접 약 ${Math.round(cfg.oral / 60)}분. ${cfg.how}`; }
   if (mode === 'prep') { headline = `${stage.label} 중`; sub = stage.how; }
   if (mode === 'oral') {
     if (phase === 'thinking') { headline = `${whoLabel(turn.who)} 질문 준비 중…`; sub = hasApiKey() ? 'Claude가 방금 답변을 듣고 질문을 만들고 있어요.' : ''; }
@@ -371,11 +390,11 @@ export default function IndivRoom({ school, onBack }) {
     else { headline = '면접 진행 중'; sub = '면접위원을 누르면 추가질문을 받을 수 있어요.'; }
   }
   if (mode === 'end') { headline = '면접이 끝났습니다'; sub = '질문과 내 답변, 모범답안을 확인해 보세요.'; }
-  const clock = mode === 'prep' ? prepClock.left : mode === 'oral' ? oralClock.left : mode === 'wait' ? stage.sec : 0;
+  const clock = mode === 'prep' ? prepClock.left : mode === 'oral' ? oralClock.left : mode === 'wait' ? (stage ? stage.sec : cfg.oral) : 0;
   const limit = mode === 'prep' ? stage.sec : cfg.oral;
   const frac = mode === 'wait' ? 1 : Math.max(0, Math.min(1, clock / limit));
   const caption = mode === 'oral' && turn && turn.text ? turn.text : '';
-  const noteLabel = stage.k === 'read' ? '메모' : '서면 답안';
+  const noteLabel = stage && stage.k === 'write' ? '서면 답안' : '메모';
 
   return createPortal(
     <div className={'cr ir' + (mode === 'prep' ? ' prep' : '')}>
@@ -398,7 +417,7 @@ export default function IndivRoom({ school, onBack }) {
           <div className="cr-room-body">
             {mode === 'prep' && set ? <Passage set={set} show={prepShow} /> : <Room active={active} roles={cfg.judges} onJudge={onJudge} me={me} />}
           </div>
-          <div className="cr-room-foot">{mode === 'prep' ? '제시문과 문제를 읽고 오른쪽에 적으세요.' : `면접위원 ${cfg.judges.length}명 · 지원자 1명${cfg.judgesSure ? '' : ' (위원 수는 공지에 없어 3명으로 배치)'} · 면접위원을 누르면 추가질문을 받을 수 있어요.`}</div>
+          <div className="cr-room-foot">{mode === 'prep' ? '제시문과 문제를 읽고 오른쪽에 적으세요.' : `면접위원 ${cfg.judges.length}명 · 지원자 1명${cfg.judgesSure ? '' : ` (위원 수는 공지에 없어 ${cfg.judges.length}명으로 배치)`} · 면접위원을 누르면 추가질문을 받을 수 있어요.`}</div>
         </section>
 
         <section className="cr-panel" aria-live="polite">
@@ -444,11 +463,11 @@ export default function IndivRoom({ school, onBack }) {
           )}
 
           <div className="cr-controls">
-            {mode === 'wait' && <button className="cr-btn primary" onClick={startPrep} disabled={!set}>면접 시작 · {stage.label}</button>}
-            {mode === 'wait' && <button className="cr-btn" onClick={enterOral} disabled={!set}>바로 구술면접</button>}
+            {mode === 'wait' && stage && <button className="cr-btn primary" onClick={startPrep} disabled={!set}>면접 시작 · {stage.label}</button>}
+            {mode === 'wait' && <button className={'cr-btn' + (stage ? '' : ' primary')} onClick={enterOral} disabled={!set}>{stage ? '바로 구술면접' : '면접 시작'}</button>}
             {mode === 'prep' && <button className="cr-btn primary" onClick={enterOral}>준비 끝 · 면접실 입장</button>}
             {(mode === 'oral' || mode === 'end') && Object.values(notes).some(Boolean) && <button className="cr-btn" onClick={() => setSheet('notes')}>내 {noteLabel}</button>}
-            {mode !== 'prep' && set && <button className="cr-btn" onClick={() => setSheet('doc')}>제시문 보기</button>}
+            {mode !== 'prep' && set && set.ps.length > 0 && <button className="cr-btn" onClick={() => setSheet('doc')}>제시문 보기</button>}
             {mode === 'oral' && <button className="cr-btn ghost" onClick={endNow}>면접 끝내기</button>}
             {mode === 'end' && <button className="cr-btn" onClick={() => setSheet('model')}>모범답안</button>}
             {mode === 'end' && <button className="cr-btn" onClick={() => again(true)}>같은 문제 다시</button>}

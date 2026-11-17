@@ -11,7 +11,7 @@ export function SchoolList({ onPick }) {
         <div className="title-block">
           <h2 className="h2">학교별 모의면접.</h2>
           <div className="accent-bar" />
-          <p className="sch-lead">지원할 학교를 고르면 그 학교의 면접 방식대로 연습할 수 있어요. 학교 공지·모집요강으로 면접 방식을 확인한 충남대·원광대·전북대·강원대가 열려 있어요. 방식을 확인하지 못한 학교는 확인될 때까지 보류합니다.</p>
+          <p className="sch-lead">지원할 학교를 고르면 그 학교의 면접 방식대로 연습할 수 있어요. 학교 공지·모집요강으로 면접 방식을 확인한 충남대·원광대·전북대·강원대·서강대·서울시립대가 열려 있어요. 방식을 확인하지 못한 학교는 확인될 때까지 보류합니다.</p>
         </div>
         {SCHOOLS.map(([region, list]) => (
           <div key={region} className="sch-region">
