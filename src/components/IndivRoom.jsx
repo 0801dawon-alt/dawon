@@ -177,9 +177,10 @@ function Room({ active, roles, onJudge, me }) {
   );
 }
 
-function Passage({ set, show }) {
+function Passage({ set, show, lead }) {
   return (
     <div className="ir-doc">
+      {lead && <p className="ir-lead">{lead}</p>}
       <h3>{set.title}</h3>
       {(set.ps || []).map(p => (
         <div key={p.label} className="ir-ps"><b>{p.label.length > 2 ? p.label : `(${p.label})`}</b>{p.source && <small>{p.source}</small>}<p>{p.text}</p></div>
@@ -189,14 +190,28 @@ function Passage({ set, show }) {
   );
 }
 
-const followupPrompt = (set, q, answer, prev, kind) => `너는 로스쿨 개별 구술면접의 면접위원이다. 법률 지식(조문·판례·법률 용어)은 묻지 않고, 논리와 가치 판단, 제시문 이해를 묻는다.
+const followupPrompt = (set, q, answer, prev, kind, written = '') => `너는 로스쿨 개별 구술면접의 면접위원이다. 법률 지식(조문·판례·법률 용어)은 묻지 않고, 논리와 가치 판단, 제시문 이해를 묻는다.
 ${kind === 'probe' ? '제시문을 제대로 읽었는지 확인하거나, 지원자가 놓친 제시문의 내용을 짚어 묻는 질문 1개를 던져라.' : kind === 'counter' ? '지원자 답변과 반대되는 입장의 가장 강한 논거를 들어 재반박을 요구하는 질문 1개를 던져라.' : '지원자의 답변을 듣고 꼬리질문 1개를 던져라. 답변의 전제나 기준을 흔들거나, 약한 근거를 파고들거나, 제시한 대안의 부작용과 실현 가능성을 따지는 것 가운데 가장 효과적인 것을 고른다.'}
 답변에 실제로 나온 표현을 짚어서 구체적으로 묻고, 2문장을 넘기지 않는다. '~입니까?'로 끝낸다. 이전 질문과 겹치지 않게 한다. 질문 문장만 출력.
 [제시문 제목] ${set.title}
 ${set.ps.length ? '[제시문] ' + set.ps.map(p => `(${p.label}) ${p.text}`).join('\n').slice(0, 3500) : ''}
-[문제] ${q}
+${set.ps.length && set.qs.length > 1 ? '[서면 문제]\n' + set.qs.map((x, i) => `${i + 1}. ${x}`).join('\n') + '\n' : ''}${written ? '[지원자의 서면 답안]\n' + written.slice(0, 3000) + '\n서면 답안과 방금 답변을 함께 근거로 삼아, 답안에 쓴 표현을 짚어 묻는다.\n' : ''}[이번 질문] ${q}
 [지원자 답변] ${(answer || '(답변 없음)').slice(0, 2500)}
 ${prev.length ? '[이미 한 질문] ' + prev.join(' / ') : ''}`;
+
+// 노크 소리: 짧은 저음 두 번(Web Audio). 소리를 낼 수 없으면 조용히 넘어간다.
+function knock() {
+  try {
+    const C = window.AudioContext || window.webkitAudioContext; const c = new C();
+    [0, 0.22].forEach(t => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = 130; o.connect(g); g.connect(c.destination);
+      g.gain.setValueAtTime(0.0001, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.6, c.currentTime + t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + t + 0.15);
+      o.start(c.currentTime + t); o.stop(c.currentTime + t + 0.16);
+    });
+    setTimeout(() => c.close && c.close(), 800);
+  } catch { /* no audio */ }
+}
 
 export default function IndivRoom({ school, onBack }) {
   const cfg = FORMATS[school];
@@ -225,6 +240,14 @@ export default function IndivRoom({ school, onBack }) {
     const b = await loadBank();
     const seen = read(seenKey, []);
     // 제시문 없이 면접실에서 질문을 받는 학교: 모범답안이 있는 단독 질문 두 개(서로 다른 주제).
+    // 강원대: 기출 형식으로 새로 쓴 세트.
+    if (cfg.source === 'kangwon') {
+      const K = (await import('../data/schools/kangwon-sets.js')).default;
+      const fresh = K.filter(p => !seen.includes(p.id));
+      const p = pick(fresh.length ? fresh : K);
+      write(seenKey, [...seen.filter(x => x !== p.id), p.id].slice(-400));
+      return { ...p, qi: 0 };
+    }
     if (cfg.source === 'q') {
       const pool = b.qs.filter(x => x.m && x.q && x.q.length <= 220);
       const fresh = pool.filter(x => !seen.includes(x.q));
@@ -247,7 +270,16 @@ export default function IndivRoom({ school, onBack }) {
 
   // 준비 단계에서 보는 문제와, 구술에서 묻는 문제.
   const prepShow = !set ? [] : cfg.main === 'one' ? [set.qi] : cfg.main === 'next' ? [0, 1] : set.qs.map((_, i) => i);
+  const notesRef = useRef(notes); notesRef.current = notes;
+  const writtenText = () => Object.entries(notesRef.current).filter(([, v]) => v && v.trim()).map(([k, v]) => (k < 0 ? '[메모] ' : `[${+k + 1}번 답안] `) + v.trim()).join('\n');
   const mainIdx = !set ? [] : cfg.main === 'one' ? [set.qi] : cfg.main === 'next' ? [2] : set.qs.map((_, i) => i);
+
+  // 강원대: 면접 종료 1분 전에 밖에서 진행요원이 노크한다.
+  useEffect(() => {
+    if (mode !== 'oral' || !cfg.knock || s.current.knocked || oralClock.left <= 0 || oralClock.left > 60) return;
+    s.current.knocked = true; knock();
+    flash('똑똑 — 면접 종료 1분 전입니다. 답변을 마무리하세요.');
+  }, [oralClock.left, mode]);
 
   const stopAll = () => { s.current.token++; voice.stop(); mic.stop(); prepClock.stop(); oralClock.stop(); setPhase('idle'); setTurn(null); };
 
@@ -277,8 +309,11 @@ export default function IndivRoom({ school, onBack }) {
     const my = ++s.current.token;
     setMode('oral'); setLog([]); setTimeUp(false);
     Object.assign(s.current, { main: mainIdx, mi: 0, fuUsed: [], pqUsed: [], asked: [], count: 0, timeUp: false });
+    s.current.knocked = false;
     oralClock.start(cfg.oral, () => { s.current.timeUp = true; setTimeUp(true); });
-    const intro = cfg.source === 'q'
+    const intro = cfg.main === 'written'
+      ? '자리에 앉으세요. 지금부터 대면 면접을 시작하겠습니다. 작성한 서면 답안의 복사본을 드렸으니 보면서 답해도 됩니다. 서면 답안을 바탕으로 질문하겠습니다.'
+      : cfg.source === 'q'
       ? '자리에 앉으세요. 지금부터 면접을 시작하겠습니다. 질문을 드리면 잠시 생각한 뒤 답변해 주세요.'
       : cfg.main === 'next'
       ? '자리에 앉으세요. 지금부터 구술면접을 시작하겠습니다. 서면으로 답한 문제와 같은 제시문에 딸린 다른 문제를 드리겠습니다. 잠시 생각한 뒤 답변해 주세요.'
@@ -294,6 +329,10 @@ export default function IndivRoom({ school, onBack }) {
     const st = s.current;
     if (st.mi >= st.main.length) return afterMains();
     const qi = st.main[st.mi++];
+    if (cfg.main === 'written') {
+      const has = (notesRef.current[qi] || '').trim();
+      return say('j1', has ? `${qi + 1}번 문제에 대해 서면 답안에 쓴 내용을 간단히 설명해 주세요.` : `${qi + 1}번 문제는 서면 답안에 쓰지 않았는데, 지금 말로 답해 보시겠습니까?`, 'q', { qi });
+    }
     const n = st.main.length > 1 ? `${qi + 1}번 문제입니다. ` : '';
     say('j1', n + set.qs[qi], 'q', { qi });
   };
@@ -307,7 +346,7 @@ export default function IndivRoom({ school, onBack }) {
   };
   const makeFu = async (kind, lastQ, lastA) => {
     if (!hasApiKey()) return { q: fallbackFu(), ai: false };
-    const q = ((await ask(followupPrompt(set, lastQ, lastA, s.current.asked, kind))) || '').trim().replace(/^["'“]|["'”]$/g, '');
+    const q = ((await ask(followupPrompt(set, lastQ, lastA, s.current.asked, kind, writtenText()))) || '').trim().replace(/^["'“]|["'”]$/g, '');
     if (q) return { q, ai: true };
     const why = lastAiIssue();
     if (why) flash(why + ' 미리 준비된 질문으로 이어 갑니다.');
@@ -379,7 +418,7 @@ export default function IndivRoom({ school, onBack }) {
   // ── 화면 ──
   const active = phase === 'speaking' || phase === 'thinking' ? turn && turn.who : phase === 'answer' ? 'me' : null;
   const whoLabel = w => w === 'me' ? '지원자(나)' : `위원 ${JUDGE.indexOf(w) + 1} · ${cfg.judges[JUDGE.indexOf(w)][0]}`;
-  const PH = [['wait', '대기실'], ...(stage ? [['prep', stage.label]] : []), ['oral', '구술면접'], ['end', '면접 종료']];
+  const PH = [['wait', '대기실'], ...(stage ? [['prep', stage.label]] : []), ['oral', cfg.oralLabel || '구술면접'], ['end', '면접 종료']];
   let headline = '대기실', sub = cfg.summary;
   if (mode === 'wait') { headline = '면접을 시작하세요'; sub = stage ? `${stage.label} ${mmss(stage.sec).replace(/^0/, '')} → 구술면접 ${Math.round(cfg.oral / 60)}분. ${stage.how}` : `구술면접 약 ${Math.round(cfg.oral / 60)}분. ${cfg.how}`; }
   if (mode === 'prep') { headline = `${stage.label} 중`; sub = stage.how; }
@@ -415,7 +454,7 @@ export default function IndivRoom({ school, onBack }) {
         <section className="cr-room">
           <div className="cr-room-head"><span><i className="cr-dot" />{mode === 'prep' ? stage.label : '면접고사장'}</span><span>{set ? set.lt || '제시문' : '문제 불러오는 중'}</span></div>
           <div className="cr-room-body">
-            {mode === 'prep' && set ? <Passage set={set} show={prepShow} /> : <Room active={active} roles={cfg.judges} onJudge={onJudge} me={me} />}
+            {mode === 'prep' && set ? <Passage set={set} show={prepShow} lead={cfg.lead} /> : <Room active={active} roles={cfg.judges} onJudge={onJudge} me={me} />}
           </div>
           <div className="cr-room-foot">{mode === 'prep' ? '제시문과 문제를 읽고 오른쪽에 적으세요.' : `면접위원 ${cfg.judges.length}명 · 지원자 1명${cfg.judgesSure ? '' : ` (위원 수는 공지에 없어 ${cfg.judges.length}명으로 배치)`} · 면접위원을 누르면 추가질문을 받을 수 있어요.`}</div>
         </section>

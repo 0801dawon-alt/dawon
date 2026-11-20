@@ -35,3 +35,4 @@
   .ir-notes textarea { flex: none; height: 110px; }
   .ir .cr-controls { margin-top: 4px; }
 }
+.ir-lead { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text); word-break: keep-all; }
