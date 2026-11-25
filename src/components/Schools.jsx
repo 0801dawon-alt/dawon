@@ -9,9 +9,10 @@ export function SchoolList({ onPick }) {
       <Rail no="05" label="SCHOOLS" numColor="#c9c6bf" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30, minWidth: 0 }}>
         <div className="title-block">
-          <h2 className="h2">학교별 모의면접.</h2>
+          <span className="sch-badge">법학전문대학원(로스쿨) 입학 면접 · 대입 면접 아님</span>
+          <h2 className="h2">로스쿨별 모의면접.</h2>
           <div className="accent-bar" />
-          <p className="sch-lead">지원할 학교를 고르면 그 학교의 면접 방식대로 연습할 수 있어요. 학교 공지·모집요강으로 면접 방식을 확인한 충남대·원광대·전북대·강원대·서강대·서울시립대가 열려 있어요. 방식을 확인하지 못한 학교는 확인될 때까지 보류합니다.</p>
+          <p className="sch-lead">지원할 로스쿨을 고르면 그 법학전문대학원의 면접 방식대로 연습할 수 있어요. 학교 공지·모집요강으로 면접 방식을 확인한 충남대·원광대·전북대·강원대·서강대·서울시립대가 열려 있어요. 방식을 확인하지 못한 학교는 확인될 때까지 보류합니다.</p>
         </div>
         {SCHOOLS.map(([region, list]) => (
           <div key={region} className="sch-region">
@@ -21,7 +22,7 @@ export function SchoolList({ onPick }) {
                 const ready = !!READY[id];
                 return (
                   <button key={id} className={'sch-card' + (ready ? ' ready' : '')} disabled={!ready} title={ready ? '' : HOLD[id] || ''} onClick={() => ready && onPick(id)}>
-                    <b>{name}</b>
+                    <b>{name} <em className="sch-ls">로스쿨</em></b>
                     <small>{ready ? READY[id] + ' →' : '보류 · ' + (HOLD[id] || '방식 미확인')}</small>
                   </button>
                 );

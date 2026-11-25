@@ -439,8 +439,9 @@ export default function IndivRoom({ school, onBack }) {
     <div className={'cr ir' + (mode === 'prep' ? ' prep' : '')}>
       <header className="cr-top">
         <div className="cr-title">
-          <button className="cr-back" onClick={() => { stopAll(); onBack(); }} aria-label="학교 목록으로">←<em> 학교 목록</em></button>
+          <button className="cr-back" onClick={() => { stopAll(); onBack(); }} aria-label="로스쿨 목록으로">←<em> 로스쿨 목록</em></button>
           <span className="cr-kicker">{cfg.kicker}</span>
+          <span className="cr-ls">법학전문대학원 입학 면접</span>
           <h1>{cfg.name} 로스쿨 <span>면접 </span>시뮬레이션</h1>
           <p>{cfg.summary}</p>
         </div>
@@ -452,7 +453,7 @@ export default function IndivRoom({ school, onBack }) {
 
       <main className="cr-main">
         <section className="cr-room">
-          <div className="cr-room-head"><span><i className="cr-dot" />{mode === 'prep' ? stage.label : '면접고사장'}</span><span>{set ? set.lt || '제시문' : '문제 불러오는 중'}</span></div>
+          <div className="cr-room-head"><span><i className="cr-dot" />{mode === 'prep' ? stage.label : '로스쿨 면접고사장'}</span><span>{set ? set.lt || '제시문' : '문제 불러오는 중'}</span></div>
           <div className="cr-room-body">
             {mode === 'prep' && set ? <Passage set={set} show={prepShow} lead={cfg.lead} /> : <Room active={active} roles={cfg.judges} onJudge={onJudge} me={me} />}
           </div>

@@ -333,8 +333,9 @@ export default function CnuRoom({ onBack }) {
     <div className="cr">
       <header className="cr-top">
         <div className="cr-title">
-          <button className="cr-back" onClick={() => { stopAll(); onBack(); }} aria-label="학교 목록으로">←<em> 학교 목록</em></button>
+          <button className="cr-back" onClick={() => { stopAll(); onBack(); }} aria-label="로스쿨 목록으로">←<em> 로스쿨 목록</em></button>
           <span className="cr-kicker">GROUP INTERVIEW · 충남대학교 법학전문대학원</span>
+          <span className="cr-ls">법학전문대학원 입학 면접</span>
           <h1>충남대 로스쿨 <span>면접 </span>시뮬레이션</h1>
           <p>다섯 명이 차례로 지정된 문제에 답합니다. <b>면접을 시작하면 내 자리 번호와 문제가 무작위로 정해집니다.</b></p>
         </div>

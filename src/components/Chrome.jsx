@@ -17,7 +17,7 @@ export function Logo({ size = 34 }) {
   );
 }
 
-export const NAV = [['home', '홈'], ['library', '지식서가'], ['mock', '모의면접'], ['schools', '학교별 면접']];
+export const NAV = [['home', '홈'], ['library', '지식서가'], ['mock', '모의면접'], ['schools', '로스쿨별 면접']];
 export const MOCK_TABS = [['questions', '예상 질문'], ['passage', '제시문'], ['practice', '실전 연습'], ['records', '내 기록']];
 
 // The mock-interview pages, shown under '모의면접' when it is pressed.

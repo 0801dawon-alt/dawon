@@ -448,3 +448,7 @@ html.snap-on { scroll-snap-type: y proximity; }
 .sch-card.ready { color: var(--ink); cursor: pointer; background: #fff; box-shadow: inset 3px 0 0 var(--wine); }
 .sch-card.ready small { color: var(--wine); font-weight: 700; }
 .sch-card.ready:hover { background: #ecebe7; }
+
+/* 로스쿨 면접임을 분명히 보이는 표시 */
+.sch-badge { align-self: flex-start; display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px; background: var(--ink, #1a1a1a); color: var(--bg, #fff); margin-bottom: 10px; }
+.sch-ls { font-style: normal; font-weight: 500; font-size: .8em; opacity: .65; }
