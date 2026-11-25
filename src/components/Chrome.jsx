@@ -60,7 +60,7 @@ export function Header({ section, tab, onNav, onSettings }) {
           모의면접{section === 'mock' && <small>· {cur}</small>}<i className="nav-caret">▾</i>
           {open && <MockMenu tab={section === 'mock' ? tab : ''} className="nav-menu" onPick={k => { setOpen(false); onNav('mock', k); }} />}
         </span>
-        <span className={section === 'schools' ? 'on' : ''} onClick={() => onNav('schools')}>학교별 면접</span>
+        <span className={section === 'schools' ? 'on' : ''} onClick={() => onNav('schools')}>로스쿨별 면접</span>
       </nav>
       <div className="header-right">
         {inArtifact() && <a className="nav-chat" href={CHAT_URL} target="_blank" rel="noopener noreferrer">Chat ↗</a>}
@@ -80,7 +80,7 @@ export function TabBar({ section, tab, onNav }) {
       <button className={section === 'home' ? 'on' : ''} onClick={() => { setOpen(false); onNav('home'); }}><b>⌂</b>홈</button>
       <button className={section === 'library' ? 'on' : ''} onClick={() => { setOpen(false); onNav('library'); }}><b>▤</b>지식서가</button>
       <button className={section === 'mock' ? 'on' : ''} onClick={() => setOpen(o => !o)}><b>◎</b>모의면접</button>
-      <button className={section === 'schools' ? 'on' : ''} onClick={() => { setOpen(false); onNav('schools'); }}><b>◇</b>학교별</button>
+      <button className={section === 'schools' ? 'on' : ''} onClick={() => { setOpen(false); onNav('schools'); }}><b>◇</b>로스쿨별</button>
     </nav>
   );
 }
